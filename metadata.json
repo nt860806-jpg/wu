@@ -1,0 +1,6 @@
+{
+  "name": "追星便利店 | 官方藝人周邊集單所",
+  "description": "專為 TWICE 與 K-POP 藝人粉絲打造的專業代購與團務品牌官網。提供官方直購、銷量榜單計入、批次物流即時追蹤與會員專屬訂單服務。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
