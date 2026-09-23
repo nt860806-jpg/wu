@@ -125,6 +125,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Admin Management State
   const [admins, setAdmins] = useState<AdminMember[]>([]);
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState<AdminMember | null>(null);
+  const [editAdminName, setEditAdminName] = useState('');
+  const [editAdminRole, setEditAdminRole] = useState<AdminMember['role']>('對帳小幫手');
+  const [editAdminEmail, setEditAdminEmail] = useState('');
+  const [editAdminPhone, setEditAdminPhone] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<AdminMember['role']>('對帳小幫手');
   const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -474,6 +479,35 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     setNewAdminEmail('');
     setNewAdminPhone('');
     setShowAddAdminModal(false);
+  };
+
+  const startEditingAdmin = (admin: AdminMember) => {
+    setEditingAdmin(admin);
+    setEditAdminName(admin.name);
+    setEditAdminRole(admin.role);
+    setEditAdminEmail(admin.email);
+    setEditAdminPhone(admin.phone === '未填寫' ? '' : admin.phone);
+  };
+
+  const handleUpdateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAdmin || !editingAdmin || !editAdminName.trim() || !editAdminEmail.trim()) return;
+    const email = editAdminEmail.trim().toLowerCase();
+    if (admins.some(member => member.id !== editingAdmin.id && member.email.toLowerCase() === email)) {
+      window.alert('這個 Email 已在名冊中。');
+      return;
+    }
+
+    const updates = {
+      name: editAdminName.trim(),
+      role: editAdminRole,
+      email,
+      phone: editAdminPhone.trim() || '未填寫',
+    };
+    const { error } = await supabase.from('admin_team').update(updates).eq('id', editingAdmin.id);
+    if (error) { window.alert('編輯失敗，請確認目前登入的是授權管理員。'); return; }
+    setAdmins(prev => prev.map(member => member.id === editingAdmin.id ? { ...member, ...updates } : member));
+    setEditingAdmin(null);
   };
 
   const handleToggleAdminStatus = async (id: string) => {
@@ -1353,6 +1387,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     >
                       {admin.isActive ? '暫時停用此帳號' : '恢復啟用'}
                     </button>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => startEditingAdmin(admin)}
+                        className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-rose-600 transition-colors"
+                        aria-label={`編輯${admin.name}`}
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        編輯資料
+                      </button>
+                    )}
                     {isAdmin && !admin.role.includes('Super') && (
                       <button
                         type="button"
@@ -1628,6 +1673,49 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 >
                   確認建立管理員
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {editingAdmin && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 space-y-4 shadow-xl border border-slate-100">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                <Edit className="w-4 h-4 text-rose-600" />
+                <span>編輯團隊成員資料</span>
+              </h3>
+              <button type="button" onClick={() => setEditingAdmin(null)} className="p-1 text-slate-400 hover:text-slate-600" aria-label="關閉編輯視窗">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateAdmin} className="space-y-3.5 text-xs">
+              <div>
+                <label className="text-slate-700 block mb-1 font-bold">管理員姓名 / 稱呼 <span className="text-rose-500">*</span></label>
+                <input type="text" required value={editAdminName} onChange={e => setEditAdminName(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-rose-500" />
+              </div>
+              <div>
+                <label className="text-slate-700 block mb-1 font-bold">權限職務身分 <span className="text-rose-500">*</span></label>
+                <select value={editAdminRole} onChange={e => setEditAdminRole(e.target.value as AdminMember['role'])} className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-medium focus:outline-rose-500">
+                  <option value="對帳小幫手">對帳小幫手 (核對後五碼與對帳單)</option>
+                  <option value="出貨品檢小幫手">出貨品檢小幫手 (品檢理貨、出貨)</option>
+                  <option value="客服小幫手">客服小幫手 (回答詢問與特典協調)</option>
+                  <option value="主團長 (Super Admin)">主團長 (Super Admin 全權限)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-slate-700 block mb-1 font-bold">管理員 Email <span className="text-rose-500">*</span></label>
+                <input type="email" required value={editAdminEmail} onChange={e => setEditAdminEmail(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-rose-500 font-mono" />
+              </div>
+              <div>
+                <label className="text-slate-700 block mb-1 font-medium">聯絡電話</label>
+                <input type="tel" value={editAdminPhone} onChange={e => setEditAdminPhone(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:outline-rose-500" />
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button type="button" onClick={() => setEditingAdmin(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-50">取消</button>
+                <button type="submit" className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs">儲存變更</button>
               </div>
             </form>
           </div>
