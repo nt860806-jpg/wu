@@ -763,7 +763,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   <div className="flex items-center gap-1.5">
                     <Filter className="w-4 h-4 text-rose-600" />
                     <span className="text-xs font-bold text-slate-800">
-                      第一層（根目錄/團體）Artist <span className="text-rose-500">*</span>：
+                      藝人團體 (Artist) <span className="text-rose-500">*</span>：
                     </span>
                     <select
                       value={selectedArtist}
@@ -787,7 +787,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   {/* 第二層（分類主題/批號）：Campaign */}
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-800">
-                      第二層（分類主題/批號）Campaign <span className="text-rose-500">*</span>：
+                      主題批號 (Campaign) <span className="text-rose-500">*</span>：
                     </span>
                     <select
                       value={selectedCampaign}

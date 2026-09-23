@@ -190,7 +190,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-rose-600 inline-block" />
-                第一層（根目錄/團體）Artist <span className="text-rose-500">*</span>
+                藝人團體 (Artist) <span className="text-rose-500">*</span>
               </span>
               <span className="text-[11px] text-slate-400 font-mono">
                 當前選取：{selectedArtist}
@@ -219,7 +219,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-slate-500" />
-                第二層（分類主題/批號）Campaign <span className="text-rose-500">*</span>
+                主題批號 (Campaign) <span className="text-rose-500">*</span>
               </span>
               <span className="text-[11px] text-slate-400 font-mono">
                 {selectedCampaign === 'ALL' ? '全部主題' : selectedCampaign}

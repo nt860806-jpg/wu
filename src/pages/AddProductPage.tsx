@@ -385,7 +385,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-rose-600" />
-                    <span>官方商品歸類層級規範（第一層 Artist → 第二層 Campaign）</span>
+                    <span>官方商品分類（Artist → Campaign）</span>
                   </span>
                   <span className="text-[10px] text-rose-600 bg-rose-100/70 px-2 py-0.5 rounded font-mono font-medium">
                     Strict Hierarchy
@@ -395,7 +395,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-bold text-slate-800 block mb-1">
-                      第一層（根目錄/團體）Artist <span className="text-rose-500">*</span>
+                      藝人團體 (Artist) <span className="text-rose-500">*</span>
                     </label>
                     <select
                       value={artist}
@@ -413,7 +413,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
 
                   <div>
                     <label className="text-xs font-bold text-slate-800 block mb-1">
-                      第二層（分類主題/批號）Campaign <span className="text-rose-500">*</span>
+                      主題批號 (Campaign) <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -444,7 +444,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   ))}
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
-                  📌 提示：當不同主題販售相同名稱的商品（如「隨機小卡」）時，系統將以第二層 Campaign 作為區分依據，庫存與價格各自獨立統計。
+                  📌 提示：不同主題販售同名商品（如「隨機小卡」）時，系統會依主題批號分開統計庫存與價格。
                 </p>
               </div>
 
