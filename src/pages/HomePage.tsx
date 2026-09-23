@@ -13,6 +13,7 @@ import {
 import { Product, ActivePage, Artist } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { isProductAvailable } from '../lib/supabase';
+import { useArtistGroups } from '../hooks/useArtistGroups';
 
 interface HomePageProps {
   products: Product[];
@@ -22,62 +23,6 @@ interface HomePageProps {
   onOpenShare: () => void;
 }
 
-const ARTIST_INFOS: Record<string, { name: string; krName: string; fandom: string; desc: string; color: string; badgeColor: string }> = {
-  'TWICE': {
-    name: 'TWICE',
-    krName: '트와이스',
-    fandom: 'ONCE',
-    desc: '10週年紀念周邊、CANDYBONG ∞ 應援手燈與回歸專輯特典熱烈集單中。',
-    color: 'from-rose-500 to-amber-400',
-    badgeColor: 'bg-rose-100 text-rose-700 border-rose-300'
-  },
-  'Stray Kids': {
-    name: 'Stray Kids',
-    krName: '스트레이 키즈',
-    fandom: 'STAY',
-    desc: 'dominATE 世界巡演 Nachimbong Ver.2 手燈與官方 SKZOO 周邊專屬代購。',
-    color: 'from-amber-500 to-red-600',
-    badgeColor: 'bg-amber-100 text-amber-800 border-amber-300'
-  },
-  'ITZY': {
-    name: 'ITZY',
-    krName: '있지',
-    fandom: 'MIDZY',
-    desc: 'Born To Be 巡迴環形手燈、官方會員限定周邊與韓國限定快閃特典。',
-    color: 'from-fuchsia-500 to-pink-600',
-    badgeColor: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300'
-  },
-  'NMIXX': {
-    name: 'NMIXX',
-    krName: '엔믹스',
-    fandom: 'NSWER',
-    desc: 'MIXXTICK 水母泡泡投影手燈、Fe3O4 通路自拍小卡與限定應援品。',
-    color: 'from-sky-500 to-blue-600',
-    badgeColor: 'bg-sky-100 text-sky-700 border-sky-300'
-  },
-  'DAY6': {
-    name: 'DAY6',
-    krName: '데이식스',
-    fandom: 'My Day',
-    desc: '十週年紀念 LIGHT BAND Ver.3 手錶手燈與回歸首週榜單專屬採購。',
-    color: 'from-emerald-500 to-teal-600',
-    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300'
-  },
-  'Xdinary Heroes': {
-    name: 'Xdinary Heroes',
-    krName: '엑스디너리 히어로즈',
-    fandom: 'Villains',
-    desc: '搖滾舞台應援周邊、首發演唱會 T-Shirt 與限定特典卡全套。',
-    color: 'from-purple-600 to-indigo-700',
-    badgeColor: 'bg-purple-100 text-purple-800 border-purple-300'
-  }
-};
-
-const FAVORITE_ARTISTS = ['TWICE', 'Stray Kids', 'ITZY', 'NMIXX', 'DAY6', 'Xdinary Heroes'] as const;
-type FavoriteArtist = typeof FAVORITE_ARTISTS[number];
-const isFavoriteArtist = (artist: unknown): artist is FavoriteArtist =>
-  typeof artist === 'string' && FAVORITE_ARTISTS.includes(artist as FavoriteArtist);
-
 export const HomePage: React.FC<HomePageProps> = ({
   products,
   onNavigate,
@@ -85,28 +30,29 @@ export const HomePage: React.FC<HomePageProps> = ({
   onSearchOrder,
   onOpenShare,
 }) => {
+  const { activeGroups } = useArtistGroups();
   const [selectedArtistTab, setSelectedArtistTab] = useState<Artist>('ALL');
   
   // 專屬藝人專區：可以修改團體 (Requirement 8)
-  const [myFavoriteArtists, setMyFavoriteArtists] = useState<FavoriteArtist[]>(() => {
+  const [myFavoriteArtists, setMyFavoriteArtists] = useState<string[]>(() => {
     try {
       const savedArtists = localStorage.getItem('my_favorite_artists');
       if (savedArtists) {
         const parsed: unknown = JSON.parse(savedArtists);
         if (Array.isArray(parsed)) {
-          const validArtists = parsed.filter(isFavoriteArtist);
+          const validArtists = parsed.filter((artist): artist is string => typeof artist === 'string');
           if (validArtists.length) return [...new Set(validArtists)];
         }
       }
       const legacyArtist = localStorage.getItem('my_favorite_artist');
-      return isFavoriteArtist(legacyArtist) ? [legacyArtist] : ['TWICE'];
+      return typeof legacyArtist === 'string' && legacyArtist ? [legacyArtist] : ['TWICE'];
     } catch {
       return ['TWICE'];
     }
   });
   const [isEditingArtist, setIsEditingArtist] = useState(false);
 
-  const handleToggleMyArtist = (artist: FavoriteArtist) => {
+  const handleToggleMyArtist = (artist: string) => {
     const nextArtists = myFavoriteArtists.includes(artist)
       ? myFavoriteArtists.filter(item => item !== artist)
       : [...myFavoriteArtists, artist];
@@ -126,7 +72,9 @@ export const HomePage: React.FC<HomePageProps> = ({
     ? activeProducts 
     : activeProducts.filter(p => p.artist === selectedArtistTab);
 
-  const selectedFavoriteArtists = myFavoriteArtists.length ? myFavoriteArtists : ['TWICE'];
+  const selectedFavoriteArtists = myFavoriteArtists.filter(name => activeGroups.some(group => group.name === name));
+  const visibleFavoriteArtists = selectedFavoriteArtists.length ? selectedFavoriteArtists : activeGroups.slice(0, 1).map(group => group.name);
+  const getGroup = (name: string) => activeGroups.find(group => group.name === name);
 
   const getArtistColor = (artist: string) => {
     switch (artist) {
@@ -197,13 +145,13 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl sm:text-2xl font-bold tracking-tight">專屬藝人專區</h3>
                   <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-rose-500 text-white font-bold">
-                    {selectedFavoriteArtists.length === 1
-                      ? `${ARTIST_INFOS[selectedFavoriteArtists[0]].fandom} 專屬`
-                      : `${selectedFavoriteArtists.length} 個本命團體`}
+                    {visibleFavoriteArtists.length === 1
+                      ? `${getGroup(visibleFavoriteArtists[0])?.fandom || visibleFavoriteArtists[0]} 專屬`
+                      : `${visibleFavoriteArtists.length} 個本命團體`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  已選本命團體：<strong className="text-white text-sm">{selectedFavoriteArtists.map(artist => `${ARTIST_INFOS[artist].name} (${ARTIST_INFOS[artist].krName})`).join('、')}</strong>
+                  已選本命團體：<strong className="text-white text-sm">{visibleFavoriteArtists.map(artist => `${getGroup(artist)?.display_name || artist}${getGroup(artist)?.kr_name ? ` (${getGroup(artist)?.kr_name})` : ''}`).join('、')}</strong>
                 </p>
               </div>
             </div>
@@ -227,8 +175,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <span className="text-[11px] text-rose-400">選擇會自動保存</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                {FAVORITE_ARTISTS.map(artist => {
-                  const info = ARTIST_INFOS[artist];
+                {activeGroups.map(group => {
+                  const artist = group.name;
                   const isCurrent = selectedFavoriteArtists.includes(artist);
                   return (
                     <button
@@ -245,7 +193,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                         <span className="text-xs font-bold">{artist}</span>
                         {isCurrent && <Check className="w-3.5 h-3.5 text-white" />}
                       </div>
-                      <span className="text-[10px] text-slate-300 mt-1 font-mono">{info.fandom}</span>
+                      <span className="text-[10px] text-slate-300 mt-1 font-mono">{group.fandom || group.display_name}</span>
                     </button>
                   );
                 })}
@@ -257,17 +205,18 @@ export const HomePage: React.FC<HomePageProps> = ({
           )}
 
           {/* 專屬團體快速導覽與最新活動 */}
-          <div className={`grid grid-cols-1 ${selectedFavoriteArtists.length > 1 ? 'md:grid-cols-2' : ''} gap-4 pt-1`}>
-            {selectedFavoriteArtists.map(artist => {
-              const artistInfo = ARTIST_INFOS[artist];
+          <div className={`grid grid-cols-1 ${visibleFavoriteArtists.length > 1 ? 'md:grid-cols-2' : ''} gap-4 pt-1`}>
+            {visibleFavoriteArtists.map(artist => {
+              const artistInfo = getGroup(artist);
+              if (!artistInfo) return null;
               const artistProducts = activeProducts.filter(product => product.artist === artist);
               return (
                 <div key={artist} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
                   <div className="flex items-center gap-2">
                     <Tag className="w-4 h-4 text-rose-400" />
-                    <h4 className="text-sm font-bold text-white">{artistInfo.name} 官方重點團務動態</h4>
+                    <h4 className="text-sm font-bold text-white">{artistInfo.display_name} 官方重點團務動態</h4>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">{artistInfo.desc}</p>
+                <p className="text-xs text-slate-300 leading-relaxed">{artistInfo.description}</p>
                   <div className="pt-2 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -277,7 +226,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                       }}
                       className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
                     >
-                      <span>直達 {artistInfo.name} 周邊專區</span>
+                        <span>直達 {artistInfo.display_name} 周邊專區</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
                     <span className="text-xs text-slate-400 self-center">
@@ -307,7 +256,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* Artist filter tabs */}
             <div className="flex flex-wrap items-center gap-2">
-              {(['ALL', 'TWICE', 'Stray Kids', 'ITZY', 'NMIXX', 'DAY6', 'Xdinary Heroes'] as Artist[]).map(artist => (
+              {(['ALL', ...activeGroups.map(group => group.name)] as Artist[]).map(artist => (
                 <button
                   key={artist}
                   type="button"

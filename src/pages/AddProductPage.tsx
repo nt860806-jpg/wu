@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Product, Artist, ProductCategory, ActivePage, UserProfile } from '../types';
 import { PageHeader } from '../components/PageHeader';
+import { useArtistGroups } from '../hooks/useArtistGroups';
 
 interface AddProductPageProps {
   onAddProduct: (product: Product) => Promise<boolean>;
@@ -43,6 +44,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
   currentUser,
   onSwitchUserRole,
 }) => {
+  const { activeGroups } = useArtistGroups();
   const isAdmin = currentUser?.role === 'admin';
   // Load draft from localStorage if available
   const savedDraft = (() => {
@@ -402,12 +404,10 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                       onChange={e => setArtist(e.target.value as Artist)}
                       className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white focus:outline-rose-500 font-bold text-slate-900"
                     >
-                      <option value="TWICE">TWICE (트와이스)</option>
-                      <option value="Stray Kids">Stray Kids (스트레이 키즈)</option>
-                      <option value="ITZY">ITZY (있지)</option>
-                      <option value="NMIXX">NMIXX (엔믹스)</option>
-                      <option value="DAY6">DAY6 (데이식스)</option>
-                      <option value="Xdinary Heroes">Xdinary Heroes</option>
+                      {editingProduct && !activeGroups.some(group => group.name === editingProduct.artist) && (
+                        <option value={editingProduct.artist}>{editingProduct.artist}（已停用）</option>
+                      )}
+                      {activeGroups.map(group => <option key={group.id} value={group.name}>{group.display_name}{group.kr_name ? ` (${group.kr_name})` : ''}</option>)}
                     </select>
                   </div>
 

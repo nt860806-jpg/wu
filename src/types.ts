@@ -1,4 +1,4 @@
-export type Artist = 'ALL' | 'TWICE' | 'Stray Kids' | 'ITZY' | 'NMIXX' | 'DAY6' | 'Xdinary Heroes';
+export type Artist = string;
 
 export type ProductCategory = 
   | 'ALL' 

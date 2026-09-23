@@ -19,6 +19,7 @@ import {
 import { Product, Artist, ProductCategory } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { isProductAvailable } from '../lib/supabase';
+import { useArtistGroups } from '../hooks/useArtistGroups';
 
 interface ProductsPageProps {
   products: Product[];
@@ -37,6 +38,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   onInstantBuy,
   onOpenShare,
 }) => {
+  const { activeGroups } = useArtistGroups();
   // 雙層篩選架構：第一層 Artist，第二層 Campaign (Requirement 6)
   const [selectedArtist, setSelectedArtist] = useState<Artist>('ALL');
   const [selectedCampaign, setSelectedCampaign] = useState<string>('ALL');
@@ -49,7 +51,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [addedToast, setAddedToast] = useState(false);
 
-  const artists: Artist[] = ['ALL', 'TWICE', 'Stray Kids', 'ITZY', 'NMIXX', 'DAY6', 'Xdinary Heroes'];
+  const artists: Artist[] = ['ALL', ...activeGroups.map(group => group.name)];
   const categories: ProductCategory[] = [
     'ALL', 
     '手燈/應援物', 

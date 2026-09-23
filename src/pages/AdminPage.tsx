@@ -27,12 +27,14 @@ import {
   Tag,
   ShieldAlert,
   Lock,
-  Trash2
+  Trash2,
+  Users
 } from 'lucide-react';
 import { Order, ShippingBatch, ActivePage, OrderStatus, AdminMember, UserProfile, Product } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { cleanPobDisplay } from '../utils/orderUtils';
 import { getTaipeiDate, isProductAvailable, supabase } from '../lib/supabase';
+import { canManageArtistGroups, useArtistGroups } from '../hooks/useArtistGroups';
 
 interface AdminPageProps {
   products: Product[];
@@ -90,9 +92,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 }) => {
   // Requirement 1: 所有修改功能只有管理員有權限
   const isAdmin = currentUser?.role === 'admin';
+  const { groups: artistGroups, activeGroups: activeArtistGroups, loadError: artistGroupsError } = useArtistGroups();
 
   // Main view tab
-  const [activeTab, setActiveTab] = useState<'orders' | 'batches' | 'admins' | 'products'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'batches' | 'admins' | 'products' | 'artists'>('orders');
   const [productView, setProductView] = useState<'available' | 'offline'>('available');
 
   // Filters for orders - 嚴格遵守兩層架構 (Requirement 5)
@@ -121,6 +124,67 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [editPaymentAccount, setEditPaymentAccount] = useState<string>('全支付(389)11016053741860');
   const [saveSuccessNotice, setSaveSuccessNotice] = useState(false);
   const [exportNotice, setExportNotice] = useState(false);
+  const [artistName, setArtistName] = useState('');
+  const [artistDisplayName, setArtistDisplayName] = useState('');
+  const [artistKrName, setArtistKrName] = useState('');
+  const [artistFandom, setArtistFandom] = useState('');
+  const [artistDescription, setArtistDescription] = useState('');
+  const [editingArtistGroupId, setEditingArtistGroupId] = useState<string | null>(null);
+  const [artistGroupNotice, setArtistGroupNotice] = useState('');
+  const [artistGroupError, setArtistGroupError] = useState('');
+
+  const resetArtistGroupForm = () => {
+    setEditingArtistGroupId(null);
+    setArtistName('');
+    setArtistDisplayName('');
+    setArtistKrName('');
+    setArtistFandom('');
+    setArtistDescription('');
+  };
+
+  const saveArtistGroup = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!isAdmin || !canManageArtistGroups(currentUser?.email)) return;
+    setArtistGroupNotice('');
+    setArtistGroupError('');
+    const name = artistName.trim();
+    if (!name) return;
+    const values = {
+      name,
+      display_name: artistDisplayName.trim() || name,
+      kr_name: artistKrName.trim(),
+      fandom: artistFandom.trim(),
+      description: artistDescription.trim(),
+    };
+    const result = editingArtistGroupId
+      ? await supabase.from('artist_groups').update(values).eq('id', editingArtistGroupId)
+      : await supabase.from('artist_groups').insert({ id: crypto.randomUUID(), ...values, is_active: true });
+    if (result.error) {
+      setArtistGroupError(result.error.message.includes('duplicate') ? '這個團體名稱已經存在。' : result.error.message);
+      return;
+    }
+    setArtistGroupNotice(editingArtistGroupId ? '團體資料已更新，各處清單會自動同步。' : '已新增團體，各處清單會自動同步。');
+    resetArtistGroupForm();
+  };
+
+  const editArtistGroup = (group: (typeof artistGroups)[number]) => {
+    setEditingArtistGroupId(group.id);
+    setArtistName(group.name);
+    setArtistDisplayName(group.display_name);
+    setArtistKrName(group.kr_name);
+    setArtistFandom(group.fandom);
+    setArtistDescription(group.description);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const setArtistGroupActive = async (group: (typeof artistGroups)[number], isActive: boolean) => {
+    if (!isAdmin || !canManageArtistGroups(currentUser?.email)) return;
+    setArtistGroupNotice('');
+    setArtistGroupError('');
+    const { error } = await supabase.from('artist_groups').update({ is_active: isActive }).eq('id', group.id);
+    if (error) setArtistGroupError(error.message);
+    else setArtistGroupNotice(isActive ? `已重新啟用 ${group.display_name}。` : `已停用 ${group.display_name}；既有商品和訂單資料會保留。`);
+  };
 
   // Admin Management State
   const [admins, setAdmins] = useState<AdminMember[]>([]);
@@ -606,8 +670,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         {/* TOP TAB NAVIGATION */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setActiveTab('orders')}
@@ -656,6 +720,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             >
               <UserCheck className="w-4 h-4" />
               <span>管理團隊與權限 ({admins.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('artists')}
+              className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center gap-2 ${
+                activeTab === 'artists' ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>藝人團體管理 ({artistGroups.length})</span>
             </button>
           </div>
 
@@ -752,6 +827,63 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </section>
         )}
 
+        {activeTab === 'artists' && (
+          <section className="space-y-5">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-5 sm:p-6">
+              <div className="mb-5">
+                <h2 className="text-lg font-bold text-slate-900">藝人團體管理</h2>
+                <p className="text-xs text-slate-500 mt-1">新增或調整團體資料，會同步到首頁本命團體、周邊篩選、商品表單與後台篩選。停用會保留歷史商品和訂單。</p>
+              </div>
+              {(artistGroupNotice || artistGroupsError) && <p role="status" className="mb-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-semibold">{artistGroupNotice || '團體清單暫時無法從資料庫讀取，目前顯示預設清單。'}</p>}
+              {artistGroupError && <p role="alert" className="mb-3 p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold">{artistGroupError}</p>}
+              <form onSubmit={saveArtistGroup} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <label className="text-xs font-semibold text-slate-700">團體名稱（資料識別）
+                  <input required value={artistName} onChange={event => setArtistName(event.target.value)} readOnly={Boolean(editingArtistGroupId)} placeholder="例如：TWICE" className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm read-only:bg-slate-100" />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">顯示名稱
+                  <input value={artistDisplayName} onChange={event => setArtistDisplayName(event.target.value)} placeholder="預設使用團體名稱" className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm" />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">韓文名稱（選填）
+                  <input value={artistKrName} onChange={event => setArtistKrName(event.target.value)} className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm" />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">粉絲名稱（選填）
+                  <input value={artistFandom} onChange={event => setArtistFandom(event.target.value)} className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm" />
+                </label>
+                <label className="text-xs font-semibold text-slate-700 md:col-span-2">團體介紹（選填）
+                  <input value={artistDescription} onChange={event => setArtistDescription(event.target.value)} className="mt-1 w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm" />
+                </label>
+                <div className="md:col-span-2 xl:col-span-3 flex gap-2">
+                  <button type="submit" disabled={!isAdmin} className="px-4 py-2.5 rounded-xl bg-rose-600 text-white text-sm font-bold disabled:opacity-50">{editingArtistGroupId ? '儲存團體資料' : '新增藝人團體'}</button>
+                  {editingArtistGroupId && <button type="button" onClick={resetArtistGroupForm} className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold">取消編輯</button>}
+                </div>
+              </form>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {artistGroups.map(group => (
+                <article key={group.id} className={`bg-white rounded-2xl border p-5 shadow-xs ${group.is_active ? 'border-slate-200' : 'border-slate-200 opacity-70'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-slate-900 truncate">{group.display_name}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">{group.kr_name || group.name}{group.fandom ? ` ・ ${group.fandom}` : ''}</p>
+                    </div>
+                    <span className={`shrink-0 px-2 py-1 rounded-full text-[10px] font-bold ${group.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{group.is_active ? '使用中' : '已停用'}</span>
+                  </div>
+                  {group.description && <p className="text-xs text-slate-600 mt-3 leading-relaxed">{group.description}</p>}
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    <button type="button" disabled={!isAdmin} onClick={() => editArtistGroup(group)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold disabled:opacity-50">編輯資料</button>
+                    {group.is_active ? (
+                      <button type="button" disabled={!isAdmin} onClick={() => { if (window.confirm(`停用「${group.display_name}」？舊商品和訂單仍會保留。`)) void setArtistGroupActive(group, false); }} className="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 text-xs font-semibold disabled:opacity-50">停用團體</button>
+                    ) : (
+                      <button type="button" disabled={!isAdmin} onClick={() => void setArtistGroupActive(group, true)} className="px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-xs font-semibold disabled:opacity-50">重新啟用</button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
         {activeTab === 'orders' && (
           <div className="space-y-6">
             {/* 1. FILTER & SUMMARY HEADER */}
@@ -775,12 +907,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       className="px-2.5 py-1.5 text-xs font-bold rounded-xl border border-rose-300 bg-rose-50/50 text-slate-900 focus:outline-rose-500 cursor-pointer shadow-2xs"
                     >
                       <option value="all">全部藝人團體 (ALL)</option>
-                      <option value="TWICE">TWICE</option>
-                      <option value="Stray Kids">Stray Kids</option>
-                      <option value="ITZY">ITZY</option>
-                      <option value="NMIXX">NMIXX</option>
-                      <option value="DAY6">DAY6</option>
-                      <option value="Xdinary Heroes">Xdinary Heroes</option>
+                      {activeArtistGroups.map(group => <option key={group.id} value={group.name}>{group.display_name}</option>)}
                     </select>
                   </div>
 
