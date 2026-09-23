@@ -297,9 +297,15 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
 
-          {/* Product Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {filteredProducts.slice(0, 8).map(product => {
+          {/* Product Cards Grid / Empty State */}
+          {filteredProducts.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-slate-200">
+              <p className="text-base font-bold text-slate-800">查無符合條件的進行中周邊商品</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {filteredProducts.slice(0, 8).map(product => {
               const progressPct = Math.min(100, Math.round((product.currentUnits / product.targetUnits) * 100));
               return (
                 <div
@@ -381,23 +387,26 @@ export const HomePage: React.FC<HomePageProps> = ({
                   </div>
                 </div>
               );
-            })}
-          </div>
+                })}
+              </div>
 
-          <div className="text-center pt-4">
-            <button
-              type="button"
-              onClick={() => onNavigate('products')}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-slate-300 hover:border-slate-400 bg-white text-slate-800 text-xs sm:text-sm font-semibold shadow-xs transition-colors"
-            >
-              <span>查看全部 JYP 藝人周邊目錄 (共 {products.length} 款)</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+              <div className="text-center pt-4">
+                <button
+                  type="button"
+                  onClick={() => onNavigate('products')}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-slate-300 hover:border-slate-400 bg-white text-slate-800 text-xs sm:text-sm font-semibold shadow-xs transition-colors"
+                >
+                  <span>查看全部 JYP 藝人周邊目錄 (共 {products.length} 款)</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </>
+          )}
         </section>
 
         {/* GROUP BUY PROCESS STEPPER */}
-        <section className="bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white rounded-3xl p-8 sm:p-12 space-y-8">
+        {filteredProducts.length > 0 && (
+          <section className="bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white rounded-3xl p-8 sm:p-12 space-y-8">
           <div className="text-center max-w-xl mx-auto space-y-2">
             <span className="text-xs font-bold text-rose-400 uppercase tracking-wider">
               HOW IT WORKS
@@ -424,7 +433,8 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             ))}
           </div>
-        </section>
+          </section>
+        )}
 
         {/* BOTTOM CTA CALLOUT */}
         <section className="bg-rose-50/70 border border-rose-200/80 rounded-3xl p-8 sm:p-12 text-center space-y-6">
