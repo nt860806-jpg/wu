@@ -73,6 +73,11 @@ const ARTIST_INFOS: Record<string, { name: string; krName: string; fandom: strin
   }
 };
 
+const FAVORITE_ARTISTS = ['TWICE', 'Stray Kids', 'ITZY', 'NMIXX', 'DAY6', 'Xdinary Heroes'] as const;
+type FavoriteArtist = typeof FAVORITE_ARTISTS[number];
+const isFavoriteArtist = (artist: unknown): artist is FavoriteArtist =>
+  typeof artist === 'string' && FAVORITE_ARTISTS.includes(artist as FavoriteArtist);
+
 export const HomePage: React.FC<HomePageProps> = ({
   products,
   onNavigate,
@@ -83,23 +88,36 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [selectedArtistTab, setSelectedArtistTab] = useState<Artist>('ALL');
   
   // 專屬藝人專區：可以修改團體 (Requirement 8)
-  const [myFavoriteArtist, setMyFavoriteArtist] = useState<Artist>(() => {
+  const [myFavoriteArtists, setMyFavoriteArtists] = useState<FavoriteArtist[]>(() => {
     try {
-      return (localStorage.getItem('my_favorite_artist') as Artist) || 'TWICE';
+      const savedArtists = localStorage.getItem('my_favorite_artists');
+      if (savedArtists) {
+        const parsed: unknown = JSON.parse(savedArtists);
+        if (Array.isArray(parsed)) {
+          const validArtists = parsed.filter(isFavoriteArtist);
+          if (validArtists.length) return [...new Set(validArtists)];
+        }
+      }
+      const legacyArtist = localStorage.getItem('my_favorite_artist');
+      return isFavoriteArtist(legacyArtist) ? [legacyArtist] : ['TWICE'];
     } catch {
-      return 'TWICE';
+      return ['TWICE'];
     }
   });
   const [isEditingArtist, setIsEditingArtist] = useState(false);
 
-  const handleSelectMyArtist = (artist: Artist) => {
-    setMyFavoriteArtist(artist);
+  const handleToggleMyArtist = (artist: FavoriteArtist) => {
+    const nextArtists = myFavoriteArtists.includes(artist)
+      ? myFavoriteArtists.filter(item => item !== artist)
+      : [...myFavoriteArtists, artist];
+    if (!nextArtists.length) return;
+    setMyFavoriteArtists(nextArtists);
     try {
-      localStorage.setItem('my_favorite_artist', artist);
+      localStorage.setItem('my_favorite_artists', JSON.stringify(nextArtists));
+      localStorage.setItem('my_favorite_artist', nextArtists[0]);
     } catch {
       // ignore
     }
-    setIsEditingArtist(false);
   };
 
   // Only active group buys (Requirement 9: sold_out/purchased are hidden from catalog)
@@ -108,8 +126,7 @@ export const HomePage: React.FC<HomePageProps> = ({
     ? activeProducts 
     : activeProducts.filter(p => p.artist === selectedArtistTab);
 
-  const myArtistInfo = ARTIST_INFOS[myFavoriteArtist] || ARTIST_INFOS['TWICE'];
-  const myArtistProducts = activeProducts.filter(p => p.artist === myFavoriteArtist);
+  const selectedFavoriteArtists = myFavoriteArtists.length ? myFavoriteArtists : ['TWICE'];
 
   const getArtistColor = (artist: string) => {
     switch (artist) {
@@ -180,11 +197,13 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl sm:text-2xl font-bold tracking-tight">專屬藝人專區</h3>
                   <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-rose-500 text-white font-bold">
-                    {myArtistInfo.fandom} 專屬
+                    {selectedFavoriteArtists.length === 1
+                      ? `${ARTIST_INFOS[selectedFavoriteArtists[0]].fandom} 專屬`
+                      : `${selectedFavoriteArtists.length} 個本命團體`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 mt-0.5">
-                  當前鎖定本命團體：<strong className="text-white text-sm">{myArtistInfo.name} ({myArtistInfo.krName})</strong>
+                  已選本命團體：<strong className="text-white text-sm">{selectedFavoriteArtists.map(artist => `${ARTIST_INFOS[artist].name} (${ARTIST_INFOS[artist].krName})`).join('、')}</strong>
                 </p>
               </div>
             </div>
@@ -204,18 +223,18 @@ export const HomePage: React.FC<HomePageProps> = ({
           {isEditingArtist && (
             <div className="p-4 bg-slate-800/90 rounded-2xl border border-slate-700 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-300">請選擇您的本命專屬藝人團體：</span>
-                <span className="text-[11px] text-rose-400">點擊即刻自動切換並保存設定</span>
+                <span className="text-xs font-bold text-slate-300">可複選本命專屬藝人團體（至少保留一團）</span>
+                <span className="text-[11px] text-rose-400">選擇會自動保存</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                {(['TWICE', 'Stray Kids', 'ITZY', 'NMIXX', 'DAY6', 'Xdinary Heroes'] as Artist[]).map(artist => {
+                {FAVORITE_ARTISTS.map(artist => {
                   const info = ARTIST_INFOS[artist];
-                  const isCurrent = myFavoriteArtist === artist;
+                  const isCurrent = selectedFavoriteArtists.includes(artist);
                   return (
                     <button
                       key={artist}
                       type="button"
-                      onClick={() => handleSelectMyArtist(artist)}
+                      onClick={() => handleToggleMyArtist(artist)}
                       className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
                         isCurrent
                           ? 'bg-rose-600 text-white border-rose-500 shadow-md ring-2 ring-rose-400/50'
@@ -231,35 +250,43 @@ export const HomePage: React.FC<HomePageProps> = ({
                   );
                 })}
               </div>
+              <div className="flex justify-end">
+                <button type="button" onClick={() => setIsEditingArtist(false)} className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold">完成</button>
+              </div>
             </div>
           )}
 
           {/* 專屬團體快速導覽與最新活動 */}
-          <div className="grid grid-cols-1 gap-4 pt-1">
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
-              <div className="flex items-center gap-2">
-                <Tag className="w-4 h-4 text-rose-400" />
-                <h4 className="text-sm font-bold text-white">{myArtistInfo.name} 官方重點團務動態</h4>
-              </div>
-              <p className="text-xs text-slate-300 leading-relaxed">{myArtistInfo.desc}</p>
-              <div className="pt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedArtistTab(myFavoriteArtist);
-                    onNavigate('products');
-                  }}
-                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
-                >
-                  <span>直達 {myArtistInfo.name} 周邊專區</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-xs text-slate-400 self-center">
-                  現正開放 {myArtistProducts.length} 款周邊集單
-                </span>
-              </div>
-            </div>
-
+          <div className={`grid grid-cols-1 ${selectedFavoriteArtists.length > 1 ? 'md:grid-cols-2' : ''} gap-4 pt-1`}>
+            {selectedFavoriteArtists.map(artist => {
+              const artistInfo = ARTIST_INFOS[artist];
+              const artistProducts = activeProducts.filter(product => product.artist === artist);
+              return (
+                <div key={artist} className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Tag className="w-4 h-4 text-rose-400" />
+                    <h4 className="text-sm font-bold text-white">{artistInfo.name} 官方重點團務動態</h4>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">{artistInfo.desc}</p>
+                  <div className="pt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedArtistTab(artist);
+                        onNavigate('products');
+                      }}
+                      className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1"
+                    >
+                      <span>直達 {artistInfo.name} 周邊專區</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs text-slate-400 self-center">
+                      現正開放 {artistProducts.length} 款周邊集單
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
 

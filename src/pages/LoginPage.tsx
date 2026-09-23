@@ -43,6 +43,19 @@ const ORDER_FLOW_STEPS: { status: OrderStatus; label: string; badgeColor: string
   { status: 'domestic_shipping', label: '9. 超商寄送', badgeColor: 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold' },
 ];
 
+const getFavoriteArtistLabel = () => {
+  try {
+    const savedArtists = localStorage.getItem('my_favorite_artists');
+    if (savedArtists) {
+      const parsed: unknown = JSON.parse(savedArtists);
+      if (Array.isArray(parsed) && parsed.length) return parsed.join('、');
+    }
+  } catch {
+    // Fall back to the previous single-artist setting.
+  }
+  return localStorage.getItem('my_favorite_artist') || 'TWICE';
+};
+
 export const LoginPage: React.FC<LoginPageProps> = ({
   currentUser,
   orders,
@@ -233,7 +246,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <div className="flex justify-between">
                   <span>專屬本命藝人：</span>
                   <strong className="text-rose-600 font-bold">
-                    {localStorage.getItem('my_favorite_artist') || 'TWICE'}
+                    {getFavoriteArtistLabel()}
                   </strong>
                 </div>
               </div>
