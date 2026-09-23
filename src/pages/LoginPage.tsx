@@ -55,6 +55,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [selectedHistoryTab, setSelectedHistoryTab] = useState<'all' | 'unpaid' | 'transit' | 'shipping'>('all');
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setLoginToast('請先輸入註冊信箱，再點忘記密碼。');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/#login` });
+    setLoginToast(error ? '目前無法寄出重設信，請稍後重試。' : '若此信箱已註冊，您會收到密碼重設信。');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginToast(isRegistering ? '正在建立會員…' : '正在驗證帳號…');
@@ -65,7 +74,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       if (error) throw error;
       if (!data.user) throw new Error('無法建立帳號，請稍後再試');
       if (isRegistering && !data.session) {
-        setLoginToast('註冊完成！請到信箱點擊驗證連結，再回來登入。');
+        setLoginToast(data.user.identities?.length === 0
+          ? '這個信箱可能已註冊。請返回登入；若忘記密碼，請使用重設密碼。'
+          : '若這是新信箱，請點擊驗證信完成註冊；若信箱已註冊，請返回登入或重設密碼。');
         return;
       }
       const role = ['asd0578236@gmail.com', 'nt860806@gmail.com'].includes((data.user.email || '').toLowerCase()) ? 'admin' : 'fan';
@@ -256,7 +267,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     <input type="checkbox" defaultChecked className="rounded text-rose-600 focus:ring-rose-500" />
                     <span>保持登入狀態並同步記錄歷史訂單</span>
                   </label>
-                  <span className="text-rose-600 hover:underline cursor-pointer">忘記密碼？</span>
+                  <button type="button" onClick={() => void handleForgotPassword()} className="text-rose-600 hover:underline">忘記密碼？</button>
                 </div>
 
                 <button

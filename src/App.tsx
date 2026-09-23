@@ -51,6 +51,12 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
     return { ...MOCK_USERS.fan, name: '訪客', email: '尚未登入', isLoggedIn: false };
   });
+  const [, setDateCheck] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setDateCheck(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -68,6 +74,7 @@ export default function App() {
 
   // Modals & Search Queries
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [orderSearchQuery, setOrderSearchQuery] = useState<string>('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -76,6 +83,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('jyp_select_products', JSON.stringify(products));
   }, [products]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      const { data, error } = await supabase.from('products').select('id,data,unpublish_at,archived').order('id');
+      if (error || !data) return;
+      setProducts(data.map(row => ({ ...row.data, id: row.id, unpublishAt: row.unpublish_at, archived: row.archived }) as Product));
+    };
+    void loadProducts();
+    const channel = supabase.channel('product-catalog-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => { void loadProducts(); }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [currentUser.isLoggedIn, currentUser.email, currentUser.role]);
 
   useEffect(() => {
     localStorage.setItem('jyp_select_orders', JSON.stringify(orders));
@@ -291,8 +309,33 @@ export default function App() {
   };
 
   // Add Product
-  const handleAddProduct = (newProduct: Product) => {
+  const handleAddProduct = async (newProduct: Product): Promise<boolean> => {
+    const { error } = await supabase.from('products').insert({ id: newProduct.id, data: newProduct, unpublish_at: newProduct.unpublishAt || null, archived: false });
+    if (error) return false;
     setProducts(prev => [newProduct, ...prev]);
+    return true;
+  };
+
+  const handleUpdateProduct = async (updated: Product): Promise<boolean> => {
+    const { error } = await supabase.from('products').update({ data: updated, unpublish_at: updated.unpublishAt || null, archived: !!updated.archived }).eq('id', updated.id);
+    if (error) return false;
+    setProducts(prev => prev.map(product => product.id === updated.id ? updated : product));
+    return true;
+  };
+
+  const handleArchiveProduct = async (productId: string) => {
+    const { error } = await supabase.from('products').update({ archived: true }).eq('id', productId);
+    if (error) { window.alert('下架失敗，請稍後重試。'); return; }
+    setProducts(prev => prev.map(product => product.id === productId ? { ...product, archived: true } : product));
+  };
+
+  const handleReopenProduct = async (productId: string) => {
+    const product = products.find(item => item.id === productId);
+    if (!product) return;
+    const reopened = { ...product, archived: false, unpublishAt: null, status: 'active' as const };
+    const { error } = await supabase.from('products').update({ data: reopened, unpublish_at: null, archived: false }).eq('id', productId);
+    if (error) { window.alert('重新上架失敗，請稍後重試。'); return; }
+    setProducts(prev => prev.map(item => item.id === productId ? reopened : item));
   };
 
   // Dynamic share metadata based on current page
@@ -401,6 +444,7 @@ export default function App() {
 
         {currentPage === 'admin' && (
           <AdminPage
+            products={products}
             orders={orders}
             batches={batches}
             onNavigate={handleNavigate}
@@ -410,6 +454,9 @@ export default function App() {
             onAdvanceBatchStatus={handleAdvanceBatchStatus}
             onUpdateBatchStatus={handleUpdateBatchStatus}
             onOpenShare={() => setIsShareModalOpen(true)}
+            onEditProduct={(product) => { setProductToEdit(product); handleNavigate('add-product'); }}
+            onArchiveProduct={handleArchiveProduct}
+            onReopenProduct={handleReopenProduct}
             currentUser={currentUser}
             onSwitchUserRole={handleSwitchUserRole}
           />
@@ -418,6 +465,8 @@ export default function App() {
         {currentPage === 'add-product' && (
           <AddProductPage
             onAddProduct={handleAddProduct}
+            editingProduct={productToEdit}
+            onUpdateProduct={handleUpdateProduct}
             onNavigate={handleNavigate}
             onOpenShare={() => setIsShareModalOpen(true)}
             currentUser={currentUser}

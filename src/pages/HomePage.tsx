@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Product, ActivePage, Artist } from '../types';
 import { PageHeader } from '../components/PageHeader';
+import { isProductAvailable } from '../lib/supabase';
 
 interface HomePageProps {
   products: Product[];
@@ -102,7 +103,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   // Only active group buys (Requirement 9: sold_out/purchased are hidden from catalog)
-  const activeProducts = products.filter(p => p.status === 'active' || p.status === 'closing_soon');
+  const activeProducts = products.filter(isProductAvailable);
   const filteredProducts = selectedArtistTab === 'ALL' 
     ? activeProducts 
     : activeProducts.filter(p => p.artist === selectedArtistTab);

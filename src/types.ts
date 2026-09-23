@@ -47,6 +47,10 @@ export interface Product {
   features: string[];
   isHot?: boolean;
   isOfficialLicense: boolean;
+  /** Date after which the item is automatically hidden from the shop. */
+  unpublishAt?: string | null;
+  /** Soft delete flag; archived items stay available to restore in admin. */
+  archived?: boolean;
 }
 
 export interface CartItem {
@@ -177,4 +181,3 @@ export type ActivePage =
   | 'add-product'
   | 'login'
   | 'contact';
-

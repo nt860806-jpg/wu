@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Product, Artist, ProductCategory } from '../types';
 import { PageHeader } from '../components/PageHeader';
+import { isProductAvailable } from '../lib/supabase';
 
 interface ProductsPageProps {
   products: Product[];
@@ -61,10 +62,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
   // Requirement 9: 已結單的團次會自動從周邊介紹下架，但不影響後台
   // A product is hidden from front-end if status is 'sold_out', 'purchased', or 'arrived'
-  const activeAvailableProducts = products.filter(item => {
-    const isClosed = item.status === 'sold_out' || item.status === 'purchased' || item.status === 'arrived';
-    return !isClosed;
-  });
+  const activeAvailableProducts = products.filter(isProductAvailable);
 
   // Dynamic campaigns based on first tier (selectedArtist)
   const availableCampaigns = Array.from(

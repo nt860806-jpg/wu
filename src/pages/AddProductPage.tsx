@@ -23,7 +23,9 @@ import { Product, Artist, ProductCategory, ActivePage, UserProfile } from '../ty
 import { PageHeader } from '../components/PageHeader';
 
 interface AddProductPageProps {
-  onAddProduct: (product: Product) => void;
+  onAddProduct: (product: Product) => Promise<boolean>;
+  editingProduct?: Product | null;
+  onUpdateProduct?: (product: Product) => Promise<boolean>;
   onNavigate: (page: ActivePage) => void;
   onOpenShare: () => void;
   currentUser?: UserProfile;
@@ -34,6 +36,8 @@ const DRAFT_STORAGE_KEY = 'jyp_select_add_product_draft';
 
 export const AddProductPage: React.FC<AddProductPageProps> = ({
   onAddProduct,
+  editingProduct,
+  onUpdateProduct,
   onNavigate,
   onOpenShare,
   currentUser,
@@ -50,19 +54,22 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     }
   })();
 
-  const [artist, setArtist] = useState<Artist>(savedDraft?.artist || 'TWICE');
-  const [campaign, setCampaign] = useState<string>(savedDraft?.campaign || '10th_Anniversary');
-  const [category, setCategory] = useState<ProductCategory>(savedDraft?.category || '演唱會/巡迴周邊');
-  const [title, setTitle] = useState(savedDraft?.title || '');
-  const [price, setPrice] = useState<number>(savedDraft?.price ?? 1280);
-  const [krwPrice, setKrwPrice] = useState<number>(savedDraft?.krwPrice ?? 55000);
-  const [jpyPrice, setJpyPrice] = useState<number>(savedDraft?.jpyPrice ?? 6200);
-  const [targetUnits, setTargetUnits] = useState<number>(savedDraft?.targetUnits ?? 100);
-  const [deadline, setDeadline] = useState(savedDraft?.deadline || '2026-10-15T23:59:59');
+  const [artist, setArtist] = useState<Artist>(editingProduct?.artist || savedDraft?.artist || 'TWICE');
+  const [campaign, setCampaign] = useState<string>(editingProduct?.campaign || savedDraft?.campaign || '10th_Anniversary');
+  const [category, setCategory] = useState<ProductCategory>(editingProduct?.category || savedDraft?.category || '演唱會/巡迴周邊');
+  const [title, setTitle] = useState(editingProduct?.title || savedDraft?.title || '');
+  const [price, setPrice] = useState<number>(editingProduct?.price ?? savedDraft?.price ?? 1280);
+  const [krwPrice, setKrwPrice] = useState<number>(editingProduct?.krwPrice ?? savedDraft?.krwPrice ?? 55000);
+  const [jpyPrice, setJpyPrice] = useState<number>(editingProduct?.jpyPrice ?? savedDraft?.jpyPrice ?? 6200);
+  const [targetUnits, setTargetUnits] = useState<number>(editingProduct?.targetUnits ?? savedDraft?.targetUnits ?? 100);
+  const [deadline, setDeadline] = useState(editingProduct?.deadline || savedDraft?.deadline || '2026-10-15T23:59:59');
+  const [unpublishAt, setUnpublishAt] = useState(editingProduct?.unpublishAt || '');
   
   // Multiple images state
   const [galleryImages, setGalleryImages] = useState<string[]>(
-    savedDraft?.galleryImages && savedDraft.galleryImages.length > 0
+    editingProduct?.gallery?.length
+      ? editingProduct.gallery
+      : savedDraft?.galleryImages && savedDraft.galleryImages.length > 0
       ? savedDraft.galleryImages
       : [
           'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000&auto=format&fit=crop',
@@ -73,23 +80,24 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
 
   const [pobDetail, setPobDetail] = useState(
-    savedDraft?.pobDetail || '贈送官方限量限定自拍小卡乙張（9款隨機發放）'
+    editingProduct?.pobDetail || savedDraft?.pobDetail || '贈送官方限量限定自拍小卡乙張（9款隨機發放）'
   );
   const [memberOptionsText, setMemberOptionsText] = useState(
-    savedDraft?.memberOptionsText || '娜璉, 定延, Momo, Sana, 志效, Mina, 多賢, 彩瑛, 子瑜'
+    editingProduct?.memberOptions?.join(', ') || savedDraft?.memberOptionsText || '娜璉, 定延, Momo, Sana, 志效, Mina, 多賢, 彩瑛, 子瑜'
   );
   const [description, setDescription] = useState(
-    savedDraft?.description || 'JYP 官方原廠授權正版商品。所有訂單直接向首爾官方鎖定配額，首週保證反映韓國銷量榜單。'
+    editingProduct?.description || savedDraft?.description || 'JYP 官方原廠授權正版商品。所有訂單直接向首爾官方鎖定配額，首週保證反映韓國銷量榜單。'
   );
   const [releaseDateText, setReleaseDateText] = useState(
-    savedDraft?.releaseDateText || '預計 10 月中旬由韓國 EMS 空運抵台'
+    editingProduct?.releaseDateText || savedDraft?.releaseDateText || '預計 10 月中旬由韓國 EMS 空運抵台'
   );
-  const [isHot, setIsHot] = useState<boolean>(savedDraft?.isHot ?? true);
+  const [isHot, setIsHot] = useState<boolean>(editingProduct?.isHot ?? savedDraft?.isHot ?? true);
   // Requirement 2: 選擇付款方式共3種
   const [paymentMethod, setPaymentMethod] = useState<string>(
-    savedDraft?.paymentMethod || '全支付(389)11016053741860'
+    editingProduct?.paymentMethod || savedDraft?.paymentMethod || '全支付(389)11016053741860'
   );
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [draftSavedTip, setDraftSavedTip] = useState(false);
 
   // Quick preset images
@@ -104,6 +112,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
 
   // Auto-save form draft to localStorage
   useEffect(() => {
+    if (editingProduct) return;
     const draft = {
       artist,
       campaign,
@@ -114,6 +123,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       jpyPrice,
       targetUnits,
       deadline,
+      unpublishAt,
       galleryImages,
       pobDetail,
       memberOptionsText,
@@ -137,6 +147,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     jpyPrice,
     targetUnits,
     deadline,
+    unpublishAt,
     galleryImages,
     pobDetail,
     memberOptionsText,
@@ -200,7 +211,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
       alert('⚠️ 權限不足：新增官方周邊與編輯功能僅限管理員操作！');
@@ -216,7 +227,8 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     const primaryImage = galleryImages[0] || 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000&auto=format&fit=crop';
 
     const newProduct: Product = {
-      id: `prod-${Date.now()}`,
+      ...(editingProduct || {} as Product),
+      id: editingProduct?.id || `prod-${Date.now()}`,
       title,
       artist,
       campaign: campaign.trim() || '10th_Anniversary',
@@ -225,9 +237,11 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       originalPrice: Math.round(Number(price) * 1.15),
       krwPrice: krwPrice ? Number(krwPrice) : undefined,
       jpyPrice: jpyPrice ? Number(jpyPrice) : undefined,
-      status: 'active',
+      status: editingProduct?.status || 'active',
       deadline,
-      currentUnits: 0,
+      unpublishAt: unpublishAt || null,
+      archived: editingProduct?.archived || false,
+      currentUnits: editingProduct?.currentUnits || 0,
       targetUnits: Number(targetUnits) || 50,
       imageUrl: primaryImage,
       gallery: galleryImages,
@@ -235,17 +249,24 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       memberOptions,
       description,
       releaseDateText,
-      features: ['韓國 JYP 原廠授權採購', '官方特典 POB 保證無損', '計入韓國銷量大榜', '加厚防撞箱超商配送'],
+      features: editingProduct?.features || ['韓國 JYP 原廠授權採購', '官方特典 POB 保證無損', '計入韓國銷量大榜', '加厚防撞箱超商配送'],
       isHot,
       isOfficialLicense: true,
       paymentMethod,
     };
 
-    onAddProduct(newProduct);
+    setSubmitError('');
+    const saved = editingProduct && onUpdateProduct
+      ? await onUpdateProduct(newProduct)
+      : await onAddProduct(newProduct);
+    if (!saved) {
+      setSubmitError('儲存失敗，請確認管理員登入狀態後重試。');
+      return;
+    }
     localStorage.removeItem(DRAFT_STORAGE_KEY);
     setSubmittedSuccess(true);
     setTimeout(() => {
-      onNavigate('products');
+      onNavigate(editingProduct ? 'admin' : 'products');
     }, 1500);
   };
 
@@ -316,9 +337,9 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     <div className="space-y-10">
       {/* 每一頁都要有頁面標題與描述 */}
       <PageHeader
-        title="開立全新官方周邊團務"
+        title={editingProduct ? '編輯官方周邊介紹' : '開立全新官方周邊團務'}
         description="支援多幣別（韓幣 ₩ / 日幣 ¥ / 台幣 NT$）換算、指定 3 種官方付款收款管道、官方特典 (POB) 明細設定與自動保留草稿。"
-        tag="管理員 · 新增周邊"
+        tag={editingProduct ? '管理員 · 編輯周邊' : '管理員 · 新增周邊'}
         actionText="← 返回後台面板"
         onActionClick={() => onNavigate('admin')}
         onOpenShareModal={onOpenShare}
@@ -332,7 +353,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Plus className="w-5 h-5 text-rose-600" />
-                <span>團務周邊基本資料填寫</span>
+                <span>{editingProduct ? '編輯周邊基本資料' : '團務周邊基本資料填寫'}</span>
               </h3>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 font-medium">
@@ -353,11 +374,12 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
             {submittedSuccess && (
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
                 <Check className="w-4 h-4" />
-                <span>商品已成功發布！正在導回周邊介紹頁面...</span>
+                <span>{editingProduct ? '商品介紹已更新！' : '商品已成功發布！'} 正在返回管理頁面...</span>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {submitError && <p role="alert" className="p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold">{submitError}</p>}
               {/* TWO-LEVEL HIERARCHY: Artist (Level 1) & Campaign (Level 2) */}
               <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-100 space-y-3">
                 <div className="flex items-center justify-between">
@@ -750,8 +772,8 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 </div>
               </div>
 
-              {/* Description & Arrival */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Description & dates */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     預計抵台與出貨時程
@@ -773,6 +795,11 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     onChange={e => setDeadline(e.target.value)}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-rose-500 font-mono"
                   />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">自動下架日期（選填）</label>
+                  <input type="date" value={unpublishAt} onChange={e => setUnpublishAt(e.target.value)} className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-rose-500 font-mono" />
+                  <p className="text-[10px] text-slate-400 mt-1">日期過後商品會移至後台「已下架／到期」。</p>
                 </div>
               </div>
 
