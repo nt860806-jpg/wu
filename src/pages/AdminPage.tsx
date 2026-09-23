@@ -26,7 +26,8 @@ import {
   RefreshCw,
   Tag,
   ShieldAlert,
-  Lock
+  Lock,
+  Trash2
 } from 'lucide-react';
 import { Order, ShippingBatch, ActivePage, OrderStatus, AdminMember, UserProfile } from '../types';
 import { PageHeader } from '../components/PageHeader';
@@ -496,6 +497,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     setAdmins(prev =>
       prev.map(a => (a.id === id ? { ...a, isActive: !a.isActive } : a))
     );
+  };
+
+  const handleDeleteAdmin = (admin: AdminMember) => {
+    if (!isAdmin || admin.role.includes('Super')) return;
+    const confirmed = window.confirm(`確定要刪除「${admin.name}」的小幫手帳號嗎？`);
+    if (!confirmed) return;
+    setAdmins(prev => prev.filter(member => member.id !== admin.id));
   };
 
   // Requirement 2: 一般會員沒有看團務後台的權限
@@ -1296,7 +1304,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   <p className="text-xs text-slate-500 font-mono mt-0.5">電話：{admin.phone}</p>
                   <p className="text-[11px] text-slate-400 mt-2">授權日：{admin.addedAt}</p>
 
-                  <div className="pt-3 mt-3 border-t border-slate-100 flex justify-end">
+                  <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-3">
                     <button
                       type="button"
                       onClick={() => handleToggleAdminStatus(admin.id)}
@@ -1304,6 +1312,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     >
                       {admin.isActive ? '暫時停用此帳號' : '恢復啟用'}
                     </button>
+                    {isAdmin && !admin.role.includes('Super') && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAdmin(admin)}
+                        className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-800 transition-colors"
+                        aria-label={`刪除${admin.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        刪除小幫手
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
