@@ -47,35 +47,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onNavigate,
   onOpenShare,
 }) => {
-  const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginToast, setLoginToast] = useState('');
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [selectedHistoryTab, setSelectedHistoryTab] = useState<'all' | 'unpaid' | 'transit' | 'shipping'>('all');
 
-  const handleDemoLogin = (role: 'fan' | 'admin') => {
-    const target = role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan;
-    onSetUser(target);
-    setLoginToast(`已切換為【${target.name}】(${role === 'admin' ? '團長管理員' : '一般粉絲'}) 身分！`);
-    setTimeout(() => {
-      setLoginToast('');
-      if (role === 'admin') onNavigate('admin');
-    }, 1200);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const updated: UserProfile = {
-      ...MOCK_USERS.fan,
-      name: email.split('@')[0] || 'ONCE 粉絲',
-      email: email || 'user@example.com'
-    };
-    onSetUser(updated);
-    setLoginToast(`歡迎回來，${updated.name}！已成功登入`);
-    setTimeout(() => {
-      setLoginToast('');
-    }, 1200);
+    setLoginToast('正在驗證帳號…');
+    try {
+      const response = await fetch('/api/auth?action=login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '登入失敗');
+      const profile: UserProfile = {
+        ...(result.user.role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan),
+        id: result.user.email,
+        name: result.user.email.split('@')[0],
+        email: result.user.email,
+        role: result.user.role,
+        isLoggedIn: true,
+      };
+      onSetUser(profile);
+      setPassword('');
+      setLoginToast('登入成功');
+    } catch (error) {
+      setLoginToast(error instanceof Error ? error.message : '登入失敗，請稍後再試');
+    }
   };
 
   // Filter historic orders for current user
@@ -180,30 +182,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             </div>
 
-            {/* Quick Demo Switcher */}
-            <div className="p-3 bg-slate-100/80 rounded-2xl border border-slate-200 space-y-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                ⚡ 快速切換體驗帳號：
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('fan')}
-                  className="p-2 text-left bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 rounded-xl text-xs transition-colors"
-                >
-                  <div className="font-bold text-slate-900">ONCE 桃子</div>
-                  <span className="text-[10px] text-slate-500">一般粉絲</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDemoLogin('admin')}
-                  className="p-2 text-left bg-white hover:bg-slate-200 border border-slate-200 hover:border-slate-400 rounded-xl text-xs transition-colors"
-                >
-                  <div className="font-bold text-slate-900">Ashley 團長</div>
-                  <span className="text-[10px] text-emerald-700">營運後台</span>
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* LOGIN / ACCOUNT DETAILS FORM */}
@@ -212,7 +190,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">
-                    {isRegister ? '註冊 追星便利店 會員帳號' : '會員帳號登入與綁定'}
+                    會員帳號登入
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     登入後可自動記錄歷史跟團訂單，無須每次輸入基本資料。
@@ -279,21 +257,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   type="submit"
                   className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
                 >
-                  <span>{isRegister ? '立即免費註冊' : '會員安全登入 / 儲存'}</span>
+                  <span>安全登入</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
             </div>
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>{isRegister ? '已經有會員帳號？' : '還沒有帳號？'}</span>
-              <button
-                type="button"
-                onClick={() => setIsRegister(!isRegister)}
-                className="text-rose-600 font-bold hover:underline"
-              >
-                {isRegister ? '返回登入' : '立即免費註冊'}
-              </button>
+              <span>僅限授權帳號登入</span>
             </div>
           </div>
         </div>

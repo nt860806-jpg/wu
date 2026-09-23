@@ -198,13 +198,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <p className="text-xs text-slate-500">{currentUser.role === 'admin' ? '最高權限團長' : 'ONCE 認證粉絲'}</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onSwitchUserRole}
-              className="text-xs px-2.5 py-1 rounded bg-slate-100 text-slate-700 font-medium hover:bg-slate-200"
-            >
-              切換成 {currentUser.role === 'admin' ? '一般粉絲' : '團長後台'}
-            </button>
+            {currentUser.isLoggedIn && (
+              <button
+                type="button"
+                onClick={onSwitchUserRole}
+                className="text-xs px-2.5 py-1 rounded bg-slate-100 text-slate-700 font-medium hover:bg-slate-200"
+              >
+                切換成 {currentUser.role === 'admin' ? '一般粉絲' : '團長後台'}
+              </button>
+            )}
           </div>
 
           {navLinks.map(({ page, label, badge }) => (

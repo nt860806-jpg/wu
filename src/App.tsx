@@ -48,9 +48,19 @@ export default function App() {
   });
 
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('jyp_select_user');
-    return saved ? JSON.parse(saved) : MOCK_USERS.fan;
+    return { ...MOCK_USERS.fan, name: '訪客', email: '尚未登入', isLoggedIn: false };
   });
+
+  useEffect(() => {
+    fetch('/api/auth')
+      .then((response) => response.json())
+      .then((result) => {
+        if (!result.authenticated || !result.user) return;
+        const base = result.user.role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan;
+        setCurrentUser({ ...base, id: result.user.email, email: result.user.email, name: result.user.email.split('@')[0], role: result.user.role, isLoggedIn: true });
+      })
+      .catch(() => localStorage.removeItem('jyp_select_user'));
+  }, []);
 
   // Modals & Search Queries
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
@@ -76,7 +86,8 @@ export default function App() {
   }, [cartItems]);
 
   useEffect(() => {
-    localStorage.setItem('jyp_select_user', JSON.stringify(currentUser));
+    if (currentUser.isLoggedIn) localStorage.setItem('jyp_select_user', JSON.stringify(currentUser));
+    else localStorage.removeItem('jyp_select_user');
   }, [currentUser]);
 
   // Scroll to top on navigation
@@ -269,11 +280,16 @@ export default function App() {
   };
 
   // User Profile Role Switch
-  const handleSwitchUserRole = () => {
-    if (currentUser.role === 'fan') {
-      setCurrentUser(MOCK_USERS.admin);
-    } else {
-      setCurrentUser(MOCK_USERS.fan);
+  const handleSwitchUserRole = async () => {
+    if (!currentUser.isLoggedIn) return;
+    try {
+      const response = await fetch('/api/auth?action=switch', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok || !result.user) return;
+      const base = result.user.role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan;
+      setCurrentUser({ ...base, id: result.user.email, email: result.user.email, name: result.user.email.split('@')[0], role: result.user.role, isLoggedIn: true });
+    } catch {
+      return;
     }
   };
 
