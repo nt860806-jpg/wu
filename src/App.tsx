@@ -60,8 +60,18 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+    const recoveryRedirect = /(?:[?#&])type=recovery(?:[&#]|$)/i.test(window.location.href);
+
+    if (recoveryRedirect) {
+      setCurrentPage('login');
+      void supabase.auth.getSession().then(({ data }) => {
+        if (isMounted && data.session) setIsPasswordRecovery(true);
+      });
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
+      if (event === 'PASSWORD_RECOVERY' || (recoveryRedirect && event === 'INITIAL_SESSION' && session)) {
         setIsPasswordRecovery(true);
         setCurrentPage('login');
       }
@@ -74,7 +84,10 @@ export default function App() {
       const base = role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan;
       setCurrentUser({ ...base, id: session.user.id, email, name: email.split('@')[0], role, isLoggedIn: true });
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Modals & Search Queries
