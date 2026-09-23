@@ -235,8 +235,8 @@ export const HomePage: React.FC<HomePageProps> = ({
           )}
 
           {/* 專屬團體快速導覽與最新活動 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2 md:col-span-2">
+          <div className="grid grid-cols-1 gap-4 pt-1">
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-2">
               <div className="flex items-center gap-2">
                 <Tag className="w-4 h-4 text-rose-400" />
                 <h4 className="text-sm font-bold text-white">{myArtistInfo.name} 官方重點團務動態</h4>
@@ -260,23 +260,6 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between space-y-2">
-              <span className="text-xs text-slate-400 font-medium">{myArtistInfo.fandom} 專屬跟團福利</span>
-              <ul className="text-xs text-slate-300 space-y-1.5">
-                <li className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                  <span>首批官方通路特典小卡優先配發</span>
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                  <span>五層加厚氣泡防撞包裝超商寄送</span>
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                  <span>實時計入 Hanteo / Circle 榜單</span>
-                </li>
-              </ul>
-            </div>
           </div>
         </section>
 
