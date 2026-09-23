@@ -27,6 +27,8 @@ interface LoginPageProps {
   onSetUser: (user: UserProfile) => void;
   onNavigate: (page: ActivePage) => void;
   onOpenShare: () => void;
+  isPasswordRecovery: boolean;
+  onPasswordRecoveryHandled: () => void;
 }
 
 const ORDER_FLOW_STEPS: { status: OrderStatus; label: string; badgeColor: string }[] = [
@@ -47,21 +49,52 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onSetUser,
   onNavigate,
   onOpenShare,
+  isPasswordRecovery,
+  onPasswordRecoveryHandled,
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginToast, setLoginToast] = useState('');
   const [loginToastType, setLoginToastType] = useState<'info' | 'success' | 'error'>('info');
   const [isRegistering, setIsRegistering] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [selectedHistoryTab, setSelectedHistoryTab] = useState<'all' | 'unpaid' | 'transit' | 'shipping'>('all');
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      setLoginToastType('error');
+      setLoginToast('新密碼至少需要 6 個字元。');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setLoginToastType('error');
+      setLoginToast('兩次輸入的新密碼不一致。');
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setLoginToastType('error');
+      setLoginToast('密碼更新失敗，請重新從重設信連結進入。');
+      return;
+    }
+    await supabase.auth.signOut();
+    onPasswordRecoveryHandled();
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setLoginToastType('success');
+    setLoginToast('密碼已更新，請使用新密碼登入。');
+  };
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
       setLoginToast('請先輸入註冊信箱，再點忘記密碼。');
       return;
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/#login` });
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin });
+    setLoginToastType(error ? 'error' : 'info');
     setLoginToast(error ? '目前無法寄出重設信，請稍後重試。' : '若此信箱已註冊，您會收到密碼重設信。');
   };
 
@@ -210,15 +243,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
 
           {/* LOGIN / ACCOUNT DETAILS FORM */}
-          {!currentUser.isLoggedIn && <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-6">
+          {(isPasswordRecovery || !currentUser.isLoggedIn) && <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">
-                    {isRegistering ? '註冊會員' : '會員帳號登入'}
+                    {isPasswordRecovery ? '設定新密碼' : isRegistering ? '註冊會員' : '會員帳號登入'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {isRegistering ? '建立帳號後即可使用會員功能。' : '登入後可自動記錄歷史跟團訂單，無須每次輸入基本資料。'}
+                    {isPasswordRecovery ? '請輸入並確認新的登入密碼。' : isRegistering ? '建立帳號後即可使用會員功能。' : '登入後可自動記錄歷史跟團訂單，無須每次輸入基本資料。'}
                   </p>
                 </div>
                 <span className="text-xs text-rose-600 font-semibold bg-rose-50 px-2.5 py-1 rounded-full border border-rose-100">
@@ -233,7 +266,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+              {isPasswordRecovery && <form onSubmit={handlePasswordUpdate} className="space-y-4 pt-1">
+                <label className="block text-xs font-bold text-slate-700">新密碼
+                  <input type="password" required minLength={6} autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-rose-500" />
+                </label>
+                <label className="block text-xs font-bold text-slate-700">再次輸入新密碼
+                  <input type="password" required minLength={6} autoComplete="new-password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:outline-rose-500" />
+                </label>
+                <button type="submit" className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold rounded-xl">儲存新密碼</button>
+              </form>}
+
+              {!isPasswordRecovery && <form onSubmit={handleSubmit} className="space-y-4 pt-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -285,14 +328,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <span>{isRegistering ? '建立會員帳號' : '安全登入'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
-              </form>
+              </form>}
             </div>
 
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            {!isPasswordRecovery && <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <button type="button" className="text-rose-600 font-semibold hover:underline" onClick={() => { setIsRegistering(!isRegistering); setLoginToast(''); }}>
                 {isRegistering ? '已有帳號？返回登入' : '還沒有帳號？立即註冊'}
               </button>
-            </div>
+            </div>}
           </div>}
         </div>
 

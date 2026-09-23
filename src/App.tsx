@@ -51,6 +51,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
     return { ...MOCK_USERS.fan, name: '訪客', email: '尚未登入', isLoggedIn: false };
   });
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [, setDateCheck] = useState(0);
 
   useEffect(() => {
@@ -59,7 +60,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+        setCurrentPage('login');
+      }
       const email = session?.user.email;
       if (!email) {
         setCurrentUser({ ...MOCK_USERS.fan, name: '訪客', email: '尚未登入', isLoggedIn: false });
@@ -439,6 +444,8 @@ export default function App() {
             batches={batches}
             onNavigate={handleNavigate}
             onOpenShare={() => setIsShareModalOpen(true)}
+            isPasswordRecovery={isPasswordRecovery}
+            onPasswordRecoveryHandled={() => setIsPasswordRecovery(false)}
           />
         )}
 
@@ -481,6 +488,8 @@ export default function App() {
             onSetUser={setCurrentUser}
             onNavigate={handleNavigate}
             onOpenShare={() => setIsShareModalOpen(true)}
+            isPasswordRecovery={isPasswordRecovery}
+            onPasswordRecoveryHandled={() => setIsPasswordRecovery(false)}
           />
         )}
 
