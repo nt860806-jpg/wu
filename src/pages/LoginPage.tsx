@@ -51,6 +51,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginToast, setLoginToast] = useState('');
+  const [loginToastType, setLoginToastType] = useState<'info' | 'success' | 'error'>('info');
   const [isRegistering, setIsRegistering] = useState(false);
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [selectedHistoryTab, setSelectedHistoryTab] = useState<'all' | 'unpaid' | 'transit' | 'shipping'>('all');
@@ -66,6 +67,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginToastType('info');
     setLoginToast(isRegistering ? '正在建立會員…' : '正在驗證帳號…');
     try {
       const { data, error } = isRegistering
@@ -74,6 +76,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       if (error) throw error;
       if (!data.user) throw new Error('無法建立帳號，請稍後再試');
       if (isRegistering && !data.session) {
+        setLoginToastType(data.user.identities?.length === 0 ? 'error' : 'info');
         setLoginToast(data.user.identities?.length === 0
           ? '這個信箱可能已註冊。請返回登入；若忘記密碼，請使用重設密碼。'
           : '若這是新信箱，請點擊驗證信完成註冊；若信箱已註冊，請返回登入或重設密碼。');
@@ -90,9 +93,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       };
       onSetUser(profile);
       setPassword('');
+      setLoginToastType('success');
       setLoginToast(isRegistering ? '註冊並登入成功' : '登入成功');
     } catch (error) {
-      setLoginToast(error instanceof Error ? error.message : '登入失敗，請稍後再試');
+      setLoginToastType('error');
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'Invalid login credentials') setLoginToast('帳號或密碼不正確，請確認電子信箱與完整密碼。');
+      else if (message === 'Email not confirmed') setLoginToast('請先到信箱點擊驗證連結，再回來登入。');
+      else setLoginToast(message || '操作失敗，請稍後再試。');
     }
   };
 
@@ -219,8 +227,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
 
               {loginToast && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
-                  <Check className="w-4 h-4" />
+                <div className={`p-3 border rounded-xl text-xs font-semibold flex items-center gap-2 ${loginToastType === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' : loginToastType === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+                  {loginToastType === 'error' ? <span className="w-4 text-center font-black">!</span> : <Check className="w-4 h-4" />}
                   <span>{loginToast}</span>
                 </div>
               )}
