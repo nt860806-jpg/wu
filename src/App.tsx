@@ -21,6 +21,7 @@ import { AdminPage } from './pages/AdminPage';
 import { AddProductPage } from './pages/AddProductPage';
 import { LoginPage } from './pages/LoginPage';
 import { ContactPage } from './pages/ContactPage';
+import { supabase, ADMIN_EMAILS } from './lib/supabase';
 
 export default function App() {
   // Navigation State
@@ -52,14 +53,17 @@ export default function App() {
   });
 
   useEffect(() => {
-    fetch('/api/auth')
-      .then((response) => response.json())
-      .then((result) => {
-        if (!result.authenticated || !result.user) return;
-        const base = result.user.role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan;
-        setCurrentUser({ ...base, id: result.user.email, email: result.user.email, name: result.user.email.split('@')[0], role: result.user.role, isLoggedIn: true });
-      })
-      .catch(() => localStorage.removeItem('jyp_select_user'));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const email = session?.user.email;
+      if (!email) {
+        setCurrentUser({ ...MOCK_USERS.fan, name: '訪客', email: '尚未登入', isLoggedIn: false });
+        return;
+      }
+      const role = ADMIN_EMAILS.includes(email.toLowerCase()) ? 'admin' : 'fan';
+      const base = role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan;
+      setCurrentUser({ ...base, id: session.user.id, email, name: email.split('@')[0], role, isLoggedIn: true });
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // Modals & Search Queries
@@ -281,16 +285,9 @@ export default function App() {
 
   // User Profile Role Switch
   const handleSwitchUserRole = async () => {
-    if (!currentUser.isLoggedIn) return;
-    try {
-      const response = await fetch('/api/auth?action=switch', { method: 'POST' });
-      const result = await response.json();
-      if (!response.ok || !result.user) return;
-      const base = result.user.role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan;
-      setCurrentUser({ ...base, id: result.user.email, email: result.user.email, name: result.user.email.split('@')[0], role: result.user.role, isLoggedIn: true });
-    } catch {
-      return;
-    }
+    if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return;
+    const role = currentUser.role === 'admin' ? 'fan' : 'admin';
+    setCurrentUser(prev => ({ ...prev, role }));
   };
 
   // Add Product

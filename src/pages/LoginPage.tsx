@@ -19,6 +19,7 @@ import {
 import { UserProfile, ActivePage, Order, OrderStatus } from '../types';
 import { MOCK_USERS } from '../data/mockData';
 import { PageHeader } from '../components/PageHeader';
+import { supabase } from '../lib/supabase';
 
 interface LoginPageProps {
   currentUser: UserProfile;
@@ -50,31 +51,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginToast, setLoginToast] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [selectedHistoryTab, setSelectedHistoryTab] = useState<'all' | 'unpaid' | 'transit' | 'shipping'>('all');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginToast('正在驗證帳號…');
+    setLoginToast(isRegistering ? '正在建立會員…' : '正在驗證帳號…');
     try {
-      const response = await fetch('/api/auth?action=login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || '登入失敗');
+      const { data, error } = isRegistering
+        ? await supabase.auth.signUp({ email: email.trim(), password })
+        : await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) throw error;
+      if (!data.user) throw new Error('無法建立帳號，請稍後再試');
+      if (isRegistering && !data.session) {
+        setLoginToast('註冊完成！請到信箱點擊驗證連結，再回來登入。');
+        return;
+      }
+      const role = ['asd0578236@gmail.com', 'nt860806@gmail.com'].includes((data.user.email || '').toLowerCase()) ? 'admin' : 'fan';
       const profile: UserProfile = {
-        ...(result.user.role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan),
-        id: result.user.email,
-        name: result.user.email.split('@')[0],
-        email: result.user.email,
-        role: result.user.role,
+        ...(role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan),
+        id: data.user.id,
+        name: (data.user.email || '').split('@')[0],
+        email: data.user.email || email,
+        role,
         isLoggedIn: true,
       };
       onSetUser(profile);
       setPassword('');
-      setLoginToast('登入成功');
+      setLoginToast(isRegistering ? '註冊並登入成功' : '登入成功');
     } catch (error) {
       setLoginToast(error instanceof Error ? error.message : '登入失敗，請稍後再試');
     }
@@ -180,20 +185,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </strong>
                 </div>
               </div>
+              {currentUser.isLoggedIn && <button type="button" onClick={() => supabase.auth.signOut()} className="px-4 py-2 rounded-xl border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50">登出會員帳號</button>}
             </div>
 
           </div>
 
           {/* LOGIN / ACCOUNT DETAILS FORM */}
-          <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-6">
+          {!currentUser.isLoggedIn && <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">
-                    會員帳號登入
+                    {isRegistering ? '註冊會員' : '會員帳號登入'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    登入後可自動記錄歷史跟團訂單，無須每次輸入基本資料。
+                    {isRegistering ? '建立帳號後即可使用會員功能。' : '登入後可自動記錄歷史跟團訂單，無須每次輸入基本資料。'}
                   </p>
                 </div>
                 <span className="text-xs text-rose-600 font-semibold bg-rose-50 px-2.5 py-1 rounded-full border border-rose-100">
@@ -257,16 +263,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   type="submit"
                   className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
                 >
-                  <span>安全登入</span>
+                  <span>{isRegistering ? '建立會員帳號' : '安全登入'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
             </div>
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>僅限授權帳號登入</span>
+              <button type="button" className="text-rose-600 font-semibold hover:underline" onClick={() => { setIsRegistering(!isRegistering); setLoginToast(''); }}>
+                {isRegistering ? '已有帳號？返回登入' : '還沒有帳號？立即註冊'}
+              </button>
             </div>
-          </div>
+          </div>}
         </div>
 
         {/* MEMBER HISTORICAL ORDERS SECTION (Requirement 3: 會員可以記錄所有歷史訂單) */}

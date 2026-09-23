@@ -32,6 +32,7 @@ import {
 import { Order, ShippingBatch, ActivePage, OrderStatus, AdminMember, UserProfile } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { cleanPobDisplay } from '../utils/orderUtils';
+import { supabase } from '../lib/supabase';
 
 interface AdminPageProps {
   orders: Order[];
@@ -64,36 +65,6 @@ export const ORDER_STATUS_FLOW_STEPS: {
   { status: 'flight_transit', stepNum: 7, label: '7. 國際航班在途中', desc: '國際空運航班飛行在空中', badgeColor: 'bg-sky-50 text-sky-800 border-sky-200' },
   { status: 'taiwan_customs_sorting', stepNum: 8, label: '8. 抵台品檢理貨', desc: '海關清關完成，品檢加厚防撞包裝', badgeColor: 'bg-amber-100 text-amber-900 border-amber-300 font-bold' },
   { status: 'domestic_shipping', stepNum: 9, label: '9. 超商寄送', desc: '已開立 7-11 賣貨便二補專屬賣場寄出', badgeColor: 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold' },
-];
-
-const INITIAL_ADMINS: AdminMember[] = [
-  {
-    id: 'adm-01',
-    name: '林團長 (ONCE 主揪)',
-    role: '主團長 (Super Admin)',
-    email: 'admin.once@jypselect.com',
-    phone: '0912-345-678',
-    addedAt: '2026-01-01',
-    isActive: true
-  },
-  {
-    id: 'adm-02',
-    name: '小佩 (對帳小幫手)',
-    role: '對帳小幫手',
-    email: 'peiyi.account@jypselect.com',
-    phone: '0922-111-222',
-    addedAt: '2026-03-10',
-    isActive: true
-  },
-  {
-    id: 'adm-03',
-    name: '阿豪 (出貨品檢組)',
-    role: '出貨品檢小幫手',
-    email: 'shipping.logistics@jypselect.com',
-    phone: '0933-555-666',
-    addedAt: '2026-04-15',
-    isActive: true
-  }
 ];
 
 export const AdminPage: React.FC<AdminPageProps> = ({
@@ -143,24 +114,25 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [exportNotice, setExportNotice] = useState(false);
 
   // Admin Management State
-  const [admins, setAdmins] = useState<AdminMember[]>(() => {
-    try {
-      const saved = localStorage.getItem('jyp_select_admin_team');
-      return saved ? JSON.parse(saved) : INITIAL_ADMINS;
-    } catch {
-      return INITIAL_ADMINS;
-    }
-  });
+  const [admins, setAdmins] = useState<AdminMember[]>([]);
   const [showAddAdminModal, setShowAddAdminModal] = useState(false);
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminRole, setNewAdminRole] = useState<AdminMember['role']>('對帳小幫手');
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminPhone, setNewAdminPhone] = useState('');
 
-  // Persist admin list
+  // Load the shared team list and keep all signed-in admin devices current.
   useEffect(() => {
-    localStorage.setItem('jyp_select_admin_team', JSON.stringify(admins));
-  }, [admins]);
+    if (!isAdmin) return;
+    const loadAdmins = async () => {
+      const { data, error } = await supabase.from('admin_team').select('*').order('added_at', { ascending: false });
+      if (error) return;
+      setAdmins(data.map(row => ({ id: row.id, name: row.name, role: row.role, email: row.email, phone: row.phone, addedAt: row.added_at, isActive: row.is_active })));
+    };
+    void loadAdmins();
+    const channel = supabase.channel('admin-team-sync').on('postgres_changes', { event: '*', schema: 'public', table: 'admin_team' }, () => { void loadAdmins(); }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [isAdmin]);
 
   // Distinct campaigns categorized under selected Artist
   const allCampaignsList = Array.from(
@@ -472,7 +444,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   };
 
   // Add Admin Handler
-  const handleAddAdmin = (e: React.FormEvent) => {
+  const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAdminName.trim() || !newAdminEmail.trim()) return;
 
@@ -486,6 +458,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       isActive: true
     };
 
+    const { error } = await supabase.from('admin_team').insert({ id: newAdmin.id, name: newAdmin.name, role: newAdmin.role, email: newAdmin.email, phone: newAdmin.phone, added_at: newAdmin.addedAt, is_active: true });
+    if (error) { window.alert('新增失敗，請確認管理員帳號已完成登入。'); return; }
     setAdmins(prev => [newAdmin, ...prev]);
     setNewAdminName('');
     setNewAdminEmail('');
@@ -493,16 +467,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     setShowAddAdminModal(false);
   };
 
-  const handleToggleAdminStatus = (id: string) => {
+  const handleToggleAdminStatus = async (id: string) => {
+    const member = admins.find(a => a.id === id);
+    if (!member) return;
+    const { error } = await supabase.from('admin_team').update({ is_active: !member.isActive }).eq('id', id);
+    if (error) { window.alert('更新失敗，請稍後再試。'); return; }
     setAdmins(prev =>
       prev.map(a => (a.id === id ? { ...a, isActive: !a.isActive } : a))
     );
   };
 
-  const handleDeleteAdmin = (admin: AdminMember) => {
+  const handleDeleteAdmin = async (admin: AdminMember) => {
     if (!isAdmin || admin.role.includes('Super')) return;
     const confirmed = window.confirm(`確定要刪除「${admin.name}」的小幫手帳號嗎？`);
     if (!confirmed) return;
+    const { error } = await supabase.from('admin_team').delete().eq('id', admin.id);
+    if (error) { window.alert('刪除失敗，請確認目前登入的是授權管理員。'); return; }
     setAdmins(prev => prev.filter(member => member.id !== admin.id));
   };
 
