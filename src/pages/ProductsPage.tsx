@@ -1,18 +1,11 @@
 import React, { useState } from 'react';
 import { 
   Search, 
-  Filter, 
   ShoppingBag, 
-  Flame, 
   Sparkles, 
   X, 
   Check, 
   ShieldCheck, 
-  Clock, 
-  Share2, 
-  Plus, 
-  Minus,
-  Layers,
   ArrowRight,
   Tag
 } from 'lucide-react';
@@ -28,6 +21,12 @@ interface ProductsPageProps {
   onAddToCart: (product: Product, member: string | undefined, qty: number) => void;
   onInstantBuy: (product: Product, member: string | undefined, qty: number) => void;
   onOpenShare: () => void;
+}
+
+interface ProductListing {
+  key: string;
+  products: Product[];
+  representative: Product;
 }
 
 export const ProductsPage: React.FC<ProductsPageProps> = ({
@@ -47,8 +46,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [sortBy, setSortBy] = useState<'hot' | 'deadline' | 'price-asc' | 'price-desc'>('hot');
 
   // Detail Modal state
-  const [selectedMember, setSelectedMember] = useState<string>('');
-  const [quantity, setQuantity] = useState(1);
+  const [selectedListingItems, setSelectedListingItems] = useState<string[]>([]);
+  const [listingQuantities, setListingQuantities] = useState<Record<string, number>>({});
+  const [listingMembers, setListingMembers] = useState<Record<string, string>>({});
   const [addedToast, setAddedToast] = useState(false);
 
   const artists: Artist[] = ['ALL', ...activeGroups.map(group => group.name)];
@@ -82,46 +82,64 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   };
 
   // Two-tier filtering adhering strictly to Artist -> Campaign
-  const filtered = activeAvailableProducts.filter(item => {
-    // 第一層（根目錄/團體）Artist *
+  const productListings: ProductListing[] = Array.from(
+    activeAvailableProducts.reduce((groups, product) => {
+      const key = product.listingGroupId || product.id;
+      const listing = groups.get(key) || { key, products: [], representative: product };
+      listing.products.push(product);
+      groups.set(key, listing);
+      return groups;
+    }, new Map<string, ProductListing>()).values()
+  );
+
+  const matchesFilters = (item: Product) => {
     if (selectedArtist !== 'ALL' && item.artist !== selectedArtist) return false;
-
-    // 第二層（分類主題/批號）Campaign *
     if (selectedCampaign !== 'ALL' && item.campaign !== selectedCampaign) return false;
-
-    // 分類篩選
     if (selectedCategory !== 'ALL' && item.category !== selectedCategory) return false;
-
-    // 關鍵字搜尋
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchTitle = item.title.toLowerCase().includes(q);
-      const matchDesc = item.description.toLowerCase().includes(q);
-      const matchArtist = item.artist.toLowerCase().includes(q);
-      const matchCampaign = item.campaign?.toLowerCase().includes(q);
-      if (!matchTitle && !matchDesc && !matchArtist && !matchCampaign) return false;
+      return item.title.toLowerCase().includes(q)
+        || item.description.toLowerCase().includes(q)
+        || item.artist.toLowerCase().includes(q)
+        || item.campaign?.toLowerCase().includes(q) || false;
     }
     return true;
-  });
+  };
 
-  // Sorting
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === 'hot') return (b.isHot ? 1 : 0) - (a.isHot ? 1 : 0);
-    if (sortBy === 'deadline') return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-    if (sortBy === 'price-asc') return a.price - b.price;
-    if (sortBy === 'price-desc') return b.price - a.price;
+  // Filter and sort at the campaign-listing level so all options stay together.
+  const sorted = productListings.filter(listing => listing.products.some(matchesFilters)).sort((a, b) => {
+    const first = a.representative;
+    const second = b.representative;
+    if (sortBy === 'hot') return (second.isHot ? 1 : 0) - (first.isHot ? 1 : 0);
+    if (sortBy === 'deadline') return new Date(first.deadline).getTime() - new Date(second.deadline).getTime();
+    if (sortBy === 'price-asc') return Math.min(...a.products.map(p => p.price)) - Math.min(...b.products.map(p => p.price));
+    if (sortBy === 'price-desc') return Math.max(...b.products.map(p => p.price)) - Math.max(...a.products.map(p => p.price));
     return 0;
   });
 
   const openModalForProduct = (p: Product) => {
     onSelectProduct(p);
-    setSelectedMember(p.memberOptions && p.memberOptions.length > 0 ? p.memberOptions[0] : '');
-    setQuantity(1);
+    const listingItems = productListings.find(listing => listing.products.some(item => item.id === p.id))?.products || [p];
+    setSelectedListingItems([]);
+    setListingQuantities(Object.fromEntries(listingItems.map(item => [item.id, 1])));
+    setListingMembers(Object.fromEntries(listingItems.map(item => [item.id, item.memberOptions?.[0] || ''])));
+  };
+
+  const selectedListingProducts = selectedProduct
+    ? (productListings.find(listing => listing.products.some(item => item.id === selectedProduct.id))?.products || [selectedProduct])
+    : [];
+
+  const toggleListingProduct = (productId: string) => {
+    setSelectedListingItems(current => current.includes(productId)
+      ? current.filter(id => id !== productId)
+      : [...current, productId]);
   };
 
   const handleModalAddToCart = () => {
     if (!selectedProduct) return;
-    onAddToCart(selectedProduct, selectedMember || undefined, quantity);
+    const items = selectedListingProducts.filter(item => selectedListingItems.includes(item.id));
+    if (!items.length) return;
+    items.forEach(item => onAddToCart(item, listingMembers[item.id] || undefined, listingQuantities[item.id] || 1));
     setAddedToast(true);
     setTimeout(() => {
       setAddedToast(false);
@@ -131,7 +149,9 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
   const handleModalInstantBuy = () => {
     if (!selectedProduct) return;
-    onInstantBuy(selectedProduct, selectedMember || undefined, quantity);
+    const items = selectedListingProducts.filter(item => selectedListingItems.includes(item.id));
+    if (!items.length) return;
+    items.forEach(item => onInstantBuy(item, listingMembers[item.id] || undefined, listingQuantities[item.id] || 1));
     onSelectProduct(null);
   };
 
@@ -299,7 +319,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
         {/* Products Grid */}
         <div className="space-y-4">
           <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>現正開放跟團：共 <strong className="text-slate-900 font-bold">{sorted.length}</strong> 款官方正版周邊</span>
+            <span>現正開放跟團：共 <strong className="text-slate-900 font-bold">{sorted.length}</strong> 團務，團內可選多種商品</span>
             <span className="hidden sm:inline">所有品項均含官方防偽標籤與首週實時計入榜單</span>
           </div>
 
@@ -325,11 +345,17 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {sorted.map(product => {
-                const progressPct = Math.min(100, Math.round((product.currentUnits / product.targetUnits) * 100));
+              {sorted.map(listing => {
+                const product = listing.representative;
+                const progressUnits = listing.products.reduce((sum, item) => sum + item.currentUnits, 0);
+                const targetUnits = listing.products.reduce((sum, item) => sum + item.targetUnits, 0);
+                const progressPct = Math.min(100, Math.round((progressUnits / Math.max(targetUnits, 1)) * 100));
+                const prices = listing.products.map(item => item.price);
+                const minPrice = Math.min(...prices);
+                const maxPrice = Math.max(...prices);
                 return (
                   <div
-                    key={product.id}
+                    key={listing.key}
                     className="bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all flex flex-col justify-between overflow-hidden group"
                   >
                     <div>
@@ -337,7 +363,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       <div className="relative aspect-square w-full overflow-hidden bg-slate-100">
                         <img
                           src={product.imageUrl}
-                          alt={product.title}
+                          alt={listing.products.length > 1 ? `${product.campaign} 團務商品` : product.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           referrerPolicy="no-referrer"
                         />
@@ -365,8 +391,21 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       {/* Content */}
                       <div className="p-4 space-y-2.5">
                         <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-rose-600 transition-colors">
-                          {product.title}
+                          {listing.products.length > 1 ? `${product.campaign || product.title} 團務` : product.title}
                         </h3>
+
+                        {listing.products.length > 1 && (
+                          <div className="space-y-1 rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                            <div className="text-[10px] font-bold text-slate-600">本團可選 {listing.products.length} 款商品</div>
+                            {listing.products.slice(0, 3).map(item => (
+                              <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] text-slate-600">
+                                <span className="truncate">{item.title}</span>
+                                <span className="shrink-0 font-mono">NT$ {item.price.toLocaleString()}</span>
+                              </div>
+                            ))}
+                            {listing.products.length > 3 && <div className="text-[10px] text-slate-400">另有 {listing.products.length - 3} 款商品</div>}
+                          </div>
+                        )}
 
                         {/* Special POB Benefit Tag */}
                         <div className="p-2 rounded-xl bg-rose-50/70 border border-rose-100 text-[11px] text-rose-900 leading-tight">
@@ -381,7 +420,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                         {/* Progress */}
                         <div className="space-y-1 pt-1">
                           <div className="flex justify-between text-[11px] font-mono text-slate-500">
-                            <span>集單進度：{product.currentUnits}/{product.targetUnits} 件</span>
+                            <span>集單進度：{progressUnits}/{targetUnits} 件</span>
                             <span className="font-bold text-rose-600">{progressPct}%</span>
                           </div>
                           <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -398,25 +437,18 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     <div className="p-4 pt-3 border-t border-slate-100 space-y-2.5">
                       <div className="flex items-baseline justify-between">
                         <span className="text-base font-extrabold text-slate-900 font-mono">
-                          NT$ {product.price.toLocaleString()}
+                          {minPrice === maxPrice ? `NT$ ${minPrice.toLocaleString()}` : `NT$ ${minPrice.toLocaleString()} 起`}
                         </span>
+                        {listing.products.length > 1 && <span className="text-[10px] text-slate-400">最高 NT$ {maxPrice.toLocaleString()}</span>}
                       </div>
-                      {(product.krwPrice || product.jpyPrice) && <div className="flex flex-wrap gap-2 text-[10px] text-slate-400 font-mono">{product.krwPrice ? <span>₩{product.krwPrice.toLocaleString()}</span> : null}{product.jpyPrice ? <span>¥{product.jpyPrice.toLocaleString()}</span> : null}</div>}
 
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => openModalForProduct(product)}
-                          className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors"
+                          className="col-span-2 w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1"
                         >
-                          商品詳情
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openModalForProduct(product)}
-                          className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1"
-                        >
-                          <span>立即跟團</span>
+                          <span>立即跟團・選擇本團商品</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -432,7 +464,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
       {/* DETAIL MODAL */}
       {selectedProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-xl p-6 sm:p-8 space-y-6 relative animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-xl p-6 sm:p-8 space-y-6 relative animate-in fade-in zoom-in-95 duration-150">
             <button
               type="button"
               onClick={() => onSelectProduct(null)}
@@ -470,13 +502,12 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   </div>
 
                   <h3 className="text-lg font-bold text-slate-900">
-                    {selectedProduct.title}
+                    {selectedListingProducts.length > 1 ? `${selectedProduct.campaign || selectedProduct.title} 團務商品` : selectedProduct.title}
                   </h3>
 
                   <div className="text-xl font-extrabold text-rose-600 font-mono">
-                    NT$ {selectedProduct.price.toLocaleString()}
+                    {selectedListingProducts.length > 1 ? `共 ${selectedListingProducts.length} 款可選商品` : `NT$ ${selectedProduct.price.toLocaleString()}`}
                   </div>
-                  {(selectedProduct.krwPrice || selectedProduct.jpyPrice) && <div className="flex gap-3 text-xs text-slate-500 font-mono">{selectedProduct.krwPrice ? <span>韓幣 ₩{selectedProduct.krwPrice.toLocaleString()}</span> : null}{selectedProduct.jpyPrice ? <span>日圓 ¥{selectedProduct.jpyPrice.toLocaleString()}</span> : null}</div>}
 
                   <div className="p-3 rounded-xl bg-rose-50/70 border border-rose-100 text-xs text-rose-950 space-y-1">
                     <div className="font-bold flex items-center gap-1.5">
@@ -487,54 +518,40 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   </div>
                 </div>
 
-                {/* Member selection if available */}
-                {selectedProduct.memberOptions && selectedProduct.memberOptions.length > 0 && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 block">
-                      選擇成員款式 / 規格：
-                    </label>
-                    <select
-                      value={selectedMember}
-                      onChange={e => setSelectedMember(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:outline-rose-500 font-medium"
-                    >
-                      {selectedProduct.memberOptions.map(m => (
-                        <option key={m} value={m}>
-                          {m}
-                        </option>
-                      ))}
-                    </select>
+                <section className="space-y-3 border-t border-slate-100 pt-4">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">選擇這團要跟的商品</h4>
+                    <p className="text-xs text-slate-500 mt-1">可以在同一團一次勾選多個品項；每個品項可分別選團員與數量。</p>
                   </div>
-                )}
-
-                {/* Quantity */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 block">跟團數量：</label>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center border border-slate-300 rounded-xl overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="px-4 py-1.5 text-xs font-bold font-mono text-slate-900">
-                        {quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setQuantity(quantity + 1)}
-                        className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <span className="text-xs text-slate-500">
-                      小計：<strong className="font-mono text-slate-900">NT$ {(selectedProduct.price * quantity).toLocaleString()}</strong>
-                    </span>
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {selectedListingProducts.map(item => {
+                      const checked = selectedListingItems.includes(item.id);
+                      return (
+                        <article key={item.id} className={`rounded-2xl border p-3 transition-colors ${checked ? 'border-rose-300 bg-rose-50/40' : 'border-slate-200 bg-white'}`}>
+                          <div className="flex items-start gap-2.5">
+                            <input type="checkbox" checked={checked} onChange={() => toggleListingProduct(item.id)} aria-label={`選擇商品 ${item.title}`} className="mt-1 h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h5 className="text-xs font-bold text-slate-900">{item.title}</h5>
+                                <strong className="text-xs font-mono text-rose-600">NT$ {item.price.toLocaleString()}</strong>
+                              </div>
+                              {(item.krwPrice || item.jpyPrice) && <div className="mt-1 flex gap-3 text-[10px] text-slate-500 font-mono">{item.krwPrice ? <span>韓幣 ₩{item.krwPrice.toLocaleString()}</span> : null}{item.jpyPrice ? <span>日圓 ¥{item.jpyPrice.toLocaleString()}</span> : null}</div>}
+                              {checked && <div className="mt-2 flex flex-wrap items-end gap-2">
+                                {item.memberOptions && item.memberOptions.length > 0 && <label className="flex-1 min-w-32 text-[10px] font-semibold text-slate-600">選擇團員<select value={listingMembers[item.id] || ''} onChange={event => setListingMembers(current => ({ ...current, [item.id]: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">{item.memberOptions.map(member => <option key={member} value={member}>{member}</option>)}</select></label>}
+                                <label className="text-[10px] font-semibold text-slate-600">數量<input type="number" min={1} value={listingQuantities[item.id] || 1} onChange={event => setListingQuantities(current => ({ ...current, [item.id]: Math.max(1, Number(event.target.value) || 1) }))} className="mt-1 block w-20 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-mono" /></label>
+                                <span className="pb-1 text-[10px] text-slate-500">小計 <strong className="font-mono text-slate-900">NT$ {(item.price * (listingQuantities[item.id] || 1)).toLocaleString()}</strong></span>
+                              </div>}
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
-                </div>
+                  <div className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 p-2.5">
+                    <span className="text-[11px] text-slate-600">已選 {selectedListingItems.length} 款商品</span>
+                    <strong className="text-xs text-slate-900">合計 NT$ {selectedListingProducts.filter(item => selectedListingItems.includes(item.id)).reduce((sum, item) => sum + item.price * (listingQuantities[item.id] || 1), 0).toLocaleString()}</strong>
+                  </div>
+                </section>
 
                 {/* Actions */}
                 <div className="space-y-2 pt-2">
@@ -548,7 +565,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     <button
                       type="button"
                       onClick={handleModalAddToCart}
-                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-900 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
+                      disabled={selectedListingItems.length === 0}
+                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
                     >
                       <ShoppingBag className="w-4 h-4" />
                       <span>加入購物車</span>
@@ -556,7 +574,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                     <button
                       type="button"
                       onClick={handleModalInstantBuy}
-                      className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+                      disabled={selectedListingItems.length === 0}
+                      className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
                     >
                       直接填單跟團
                     </button>

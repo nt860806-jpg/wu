@@ -335,8 +335,10 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     };
 
     const now = Date.now();
+    const listingGroupId = editingProduct?.listingGroupId || `group-${now}`;
     const productsToPublish: Product[] = productDrafts.map((item, index) => ({
         ...commonProductFields,
+        listingGroupId,
         id: index === 0 && editingProduct ? editingProduct.id : `prod-${now}-${index + 1}`,
         title: item.title.trim(),
         price: Number(item.price),
@@ -471,7 +473,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
             {submittedSuccess && (
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
                 <Check className="w-4 h-4" />
-                <span>{editingProduct ? '商品介紹已更新！' : '商品已成功發布！'} 正在返回管理頁面...</span>
+                <span>{editingProduct ? '商品介紹已更新！' : '團務與團內商品已成功發布！'} 正在返回管理頁面...</span>
               </div>
             )}
 
@@ -859,7 +861,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   type="submit"
                   className="flex-1 py-3 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-rose-200 flex items-center justify-center gap-2"
                 >
-                  <span>{editingProduct ? `儲存周邊介紹 (NT$ ${Number(price).toLocaleString()})` : `一次上架 ${additionalProducts.filter(item => item.title.trim() && item.price > 0).length + 1} 款商品`}</span>
+                  <span>{editingProduct ? `儲存周邊介紹 (NT$ ${Number(price).toLocaleString()})` : `建立 1 個團務（${additionalProducts.filter(item => item.title.trim() && item.price > 0).length + 1} 款可選商品）`}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

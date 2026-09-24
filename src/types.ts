@@ -24,6 +24,8 @@ export const OFFICIAL_PAYMENT_ACCOUNTS: OfficialPaymentAccount[] = [
 
 export interface Product {
   id: string;
+  /** Products published together under one group-buy listing share a single storefront card. */
+  listingGroupId?: string;
   title: string;
   artist: Artist; // 第一層（根目錄/團體）
   campaign: string; // 第二層（分類主題/批號，例：10th_Anniversary、WorldTour_MD、FanMeeting_3rd）
