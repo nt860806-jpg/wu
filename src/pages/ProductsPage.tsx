@@ -143,7 +143,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     setAddedToast(true);
     setTimeout(() => {
       setAddedToast(false);
-      onSelectProduct(null);
     }, 1200);
   };
 
