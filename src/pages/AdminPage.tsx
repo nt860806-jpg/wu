@@ -487,25 +487,53 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
   // Export Clean CSV (Without removed store/tracking columns)
   const handleExportCsv = () => {
-    const headers = ['訂單編號', '下單日期', '團次代碼', '訂購人姓名', '社群暱稱', '手機號碼', '信箱', '訂購品項', '特典小卡順位', '總金額', '二補金額', '指定收款帳戶', '匯款狀態', '帳號末五碼', '九階段物流狀態', '備註'];
-    const rows = filteredOrders.map(o => [
-      o.id,
-      o.createdAt,
-      o.batchCode,
-      o.customerName,
-      o.socialNickname || '',
-      o.phone,
-      o.email || '',
-      o.items.map(i => `${i.title}(${i.selectedMember || '通版'}x${i.quantity})`).join('; '),
-      cleanPobDisplay(o.pobPreference),
-      o.totalAmount,
-      o.secondPaymentAmount ?? 0,
-      o.paymentAccount || '全支付(389)11016053741860',
-      o.paymentStatus === 'paid' ? '已核帳' : o.paymentStatus === 'verifying' ? '核對中' : '未付款',
-      o.bankLastFive || '',
-      getStatusBadge(o.orderStatus).label,
-      o.notes || ''
-    ]);
+    const headers = [
+      '主題批號', '藝人團體', '品項', '規格/成員', '單價', '數量', '品項小計',
+      '訂單編號', '下單日期', '團次代碼', '訂購人姓名', '社群暱稱', '手機號碼', '信箱',
+      '特典小卡順位', '訂單總金額', '二補金額', '指定收款帳戶', '匯款狀態', '帳號末五碼',
+      '九階段物流狀態', '備註'
+    ];
+    const itemRows = filteredOrders.flatMap(order =>
+      groupOrderItemsByCampaign(order.items, order.campaign).flatMap(group =>
+        group.items.map(item => ({ order, group, item }))
+      )
+    ).sort((a, b) =>
+      a.group.artist.localeCompare(b.group.artist, 'zh-Hant') ||
+      a.group.campaign.localeCompare(b.group.campaign, 'zh-Hant') ||
+      a.item.title.localeCompare(b.item.title, 'zh-Hant') ||
+      (a.item.selectedMember || '').localeCompare(b.item.selectedMember || '', 'zh-Hant') ||
+      a.order.createdAt.localeCompare(b.order.createdAt) ||
+      a.order.id.localeCompare(b.order.id)
+    );
+    const exportedOrderIds = new Set<string>();
+    const rows = itemRows.map(({ order, group, item }) => {
+      const isFirstLineForOrder = !exportedOrderIds.has(order.id);
+      exportedOrderIds.add(order.id);
+      return [
+        group.campaign,
+        group.artist,
+        item.title,
+        item.selectedMember || '通版',
+        item.price,
+        item.quantity,
+        item.price * item.quantity,
+        order.id,
+        order.createdAt,
+        order.batchCode,
+        order.customerName,
+        order.socialNickname || '',
+        order.phone,
+        order.email || '',
+        cleanPobDisplay(item.pobPreference || order.pobPreference),
+        isFirstLineForOrder ? order.totalAmount : '',
+        isFirstLineForOrder ? order.secondPaymentAmount ?? 0 : '',
+        isFirstLineForOrder ? order.paymentAccount || '全支付(389)11016053741860' : '',
+        isFirstLineForOrder ? order.paymentStatus === 'paid' ? '已核帳' : order.paymentStatus === 'verifying' ? '核對中' : '未付款' : '',
+        isFirstLineForOrder ? order.bankLastFive || '' : '',
+        isFirstLineForOrder ? getStatusBadge(order.orderStatus).label : '',
+        isFirstLineForOrder ? order.notes || '' : ''
+      ];
+    });
 
     const csvContent = '\uFEFF' + [headers, ...rows].map(e => e.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

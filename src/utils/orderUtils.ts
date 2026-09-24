@@ -13,7 +13,18 @@ export function groupOrderItemsByCampaign(items: OrderItem[], fallbackCampaign =
     const campaign = item.campaign || fallbackCampaign;
     const key = JSON.stringify([artist, campaign]);
     const group = groups.get(key) || { artist, campaign, items: [] };
-    group.items.push(item);
+    const existingItem = group.items.find(candidate =>
+      candidate.productId === item.productId &&
+      candidate.title === item.title &&
+      candidate.selectedMember === item.selectedMember &&
+      candidate.pobPreference === item.pobPreference &&
+      candidate.price === item.price
+    );
+    if (existingItem) {
+      existingItem.quantity += item.quantity;
+    } else {
+      group.items.push({ ...item });
+    }
     groups.set(key, group);
   }
   return Array.from(groups.values());

@@ -20,6 +20,7 @@ import { UserProfile, ActivePage, Order, OrderStatus } from '../types';
 import { MOCK_USERS } from '../data/mockData';
 import { PageHeader } from '../components/PageHeader';
 import { supabase } from '../lib/supabase';
+import { groupOrderItemsByCampaign } from '../utils/orderUtils';
 
 interface LoginPageProps {
   currentUser: UserProfile;
@@ -472,27 +473,36 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     </div>
 
                     {/* Order Items */}
-                    <div className="space-y-2">
-                      {order.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center justify-between gap-3 text-xs">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={item.imageUrl}
-                              alt={item.title}
-                              className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
-                              referrerPolicy="no-referrer"
-                            />
-                            <div>
-                              <div className="font-bold text-slate-900 line-clamp-1">{item.title}</div>
-                              <div className="text-[11px] text-slate-500">
-                                規格：{item.selectedMember || '標準版'} | 數量：{item.quantity} 件
+                    <div className="space-y-3">
+                      {groupOrderItemsByCampaign(order.items, order.campaign).map(group => (
+                        <section key={`${group.artist}-${group.campaign}`} className="rounded-xl border border-slate-200 overflow-hidden">
+                          <h4 className="px-3 py-2 bg-slate-50 text-[11px] font-bold text-slate-700">
+                            {group.artist}・{group.campaign}
+                          </h4>
+                          <div className="space-y-2 p-3">
+                            {group.items.map((item, idx) => (
+                              <div key={`${item.productId}-${item.selectedMember || 'standard'}-${idx}`} className="flex items-center justify-between gap-3 text-xs">
+                                <div className="flex items-center gap-3">
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.title}
+                                    className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div>
+                                    <div className="font-bold text-slate-900 line-clamp-1">{item.title}</div>
+                                    <div className="text-[11px] text-slate-500">
+                                      規格：{item.selectedMember || '標準版'} | 數量：{item.quantity} 件
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="font-mono font-bold text-slate-900 shrink-0">
+                                  NT$ {(item.price * item.quantity).toLocaleString()}
+                                </span>
                               </div>
-                            </div>
+                            ))}
                           </div>
-                          <span className="font-mono font-bold text-slate-900 shrink-0">
-                            NT$ {(item.price * item.quantity).toLocaleString()}
-                          </span>
-                        </div>
+                        </section>
                       ))}
                     </div>
 
