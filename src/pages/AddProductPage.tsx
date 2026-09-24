@@ -36,6 +36,13 @@ interface AddProductPageProps {
 
 const DRAFT_STORAGE_KEY = 'jyp_select_add_product_draft';
 
+interface AdditionalProductDraft {
+  id: string;
+  title: string;
+  price: number;
+  canChooseMember: boolean;
+}
+
 export const AddProductPage: React.FC<AddProductPageProps> = ({
   onAddProduct,
   editingProduct,
@@ -90,6 +97,12 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
   const [memberOptionsText, setMemberOptionsText] = useState(
     editingProduct?.memberOptions?.join(', ') || savedDraft?.memberOptionsText || '娜璉, 定延, Momo, Sana, 志效, Mina, 多賢, 彩瑛, 子瑜'
   );
+  const [canChooseMember, setCanChooseMember] = useState<boolean>(
+    editingProduct ? Boolean(editingProduct.memberOptions?.length) : savedDraft?.canChooseMember ?? true
+  );
+  const [additionalProducts, setAdditionalProducts] = useState<AdditionalProductDraft[]>(
+    editingProduct ? [] : savedDraft?.additionalProducts || []
+  );
   const [description, setDescription] = useState(
     editingProduct?.description || savedDraft?.description || 'JYP 官方原廠授權正版商品。所有訂單直接向首爾官方鎖定配額，首週保證反映韓國銷量榜單。'
   );
@@ -132,6 +145,8 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       galleryImages,
       pobDetail,
       memberOptionsText,
+      canChooseMember,
+      additionalProducts,
       description,
       releaseDateText,
       isHot,
@@ -156,6 +171,8 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     galleryImages,
     pobDetail,
     memberOptionsText,
+    canChooseMember,
+    additionalProducts,
     description,
     releaseDateText,
     isHot,
@@ -168,6 +185,8 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       localStorage.removeItem(DRAFT_STORAGE_KEY);
       setTitle('');
       setPrice(1200);
+      setAdditionalProducts([]);
+      setCanChooseMember(true);
       setKrwPrice(50000);
       setJpyPrice(5500);
       setPaymentMethod('全支付(389)11016053741860');
@@ -248,13 +267,33 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     }
   };
 
+  const handleAddAdditionalProduct = () => {
+    setAdditionalProducts(prev => [
+      ...prev,
+      { id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: '', price: Number(price) || 0, canChooseMember: true }
+    ]);
+  };
+
+  const handleUpdateAdditionalProduct = (id: string, updates: Partial<AdditionalProductDraft>) => {
+    setAdditionalProducts(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+  };
+
+  const handleRemoveAdditionalProduct = (id: string) => {
+    setAdditionalProducts(prev => prev.filter(item => item.id !== id));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
       alert('⚠️ 權限不足：新增官方周邊與編輯功能僅限管理員操作！');
       return;
     }
-    if (!title.trim()) return;
+    setSubmitError('');
+    if (!title.trim() || Number(price) <= 0) return;
+    if (additionalProducts.some(item => !item.title.trim() || item.price <= 0)) {
+      setSubmitError('請填寫每個新增商品的名稱和有效售價，或刪除未完成的商品列。');
+      return;
+    }
 
     const memberOptions = memberOptionsText
       .split(/[,，\n]/)
@@ -263,27 +302,19 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
 
     const primaryImage = galleryImages[0] || 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000&auto=format&fit=crop';
 
-    const newProduct: Product = {
+    const commonProductFields: Omit<Product, 'id' | 'title' | 'price' | 'originalPrice' | 'krwPrice' | 'jpyPrice' | 'targetUnits' | 'memberOptions'> = {
       ...(editingProduct || {} as Product),
-      id: editingProduct?.id || `prod-${Date.now()}`,
-      title,
       artist,
       campaign: campaign.trim() || '10th_Anniversary',
       category,
-      price: Number(price),
-      originalPrice: Math.round(Number(price) * 1.15),
-      krwPrice: krwPrice ? Number(krwPrice) : undefined,
-      jpyPrice: jpyPrice ? Number(jpyPrice) : undefined,
       status: editingProduct?.status || 'active',
       deadline,
       unpublishAt: unpublishAt || null,
       archived: editingProduct?.archived || false,
       currentUnits: editingProduct?.currentUnits || 0,
-      targetUnits: Number(targetUnits) || 50,
       imageUrl: primaryImage,
       gallery: galleryImages,
       pobDetail,
-      memberOptions,
       description,
       releaseDateText,
       features: editingProduct?.features || ['韓國 JYP 原廠授權採購', '官方特典 POB 保證無損', '計入韓國銷量大榜', '加厚防撞箱超商配送'],
@@ -292,13 +323,40 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       paymentMethod,
     };
 
-    setSubmitError('');
-    const saved = editingProduct && onUpdateProduct
-      ? await onUpdateProduct(newProduct)
-      : await onAddProduct(newProduct);
-    if (!saved) {
-      setSubmitError('儲存失敗，請確認管理員登入狀態後重試。');
-      return;
+    const now = Date.now();
+    const productsToPublish: Product[] = [
+      {
+        ...commonProductFields,
+        id: editingProduct?.id || `prod-${now}-1`,
+        title: title.trim(),
+        price: Number(price),
+        originalPrice: Math.round(Number(price) * 1.15),
+        krwPrice: krwPrice ? Number(krwPrice) : undefined,
+        jpyPrice: jpyPrice ? Number(jpyPrice) : undefined,
+        targetUnits: Number(targetUnits) || 50,
+        memberOptions: canChooseMember ? memberOptions : [],
+      },
+      ...(editingProduct ? [] : additionalProducts.map((item, index) => ({
+        ...commonProductFields,
+        id: `prod-${now}-${index + 2}`,
+        title: item.title.trim(),
+        price: Number(item.price),
+        originalPrice: Math.round(Number(item.price) * 1.15),
+        targetUnits: Number(targetUnits) || 50,
+        memberOptions: item.canChooseMember ? memberOptions : [],
+      })))
+    ];
+
+    for (const [index, product] of productsToPublish.entries()) {
+      const saved = editingProduct && index === 0 && onUpdateProduct
+        ? await onUpdateProduct(product)
+        : await onAddProduct(product);
+      if (!saved) {
+        setSubmitError(productsToPublish.length > 1
+          ? `第 ${index + 1} 項儲存失敗；先前已成功發布的品項仍保留，請至後台確認後再重試。`
+          : '儲存失敗，請確認管理員登入狀態後重試。');
+        return;
+      }
     }
     localStorage.removeItem(DRAFT_STORAGE_KEY);
     setSubmittedSuccess(true);
@@ -375,7 +433,9 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       {/* 每一頁都要有頁面標題與描述 */}
       <PageHeader
         title={editingProduct ? '編輯官方周邊介紹' : '開立全新官方周邊團務'}
-        description="支援多幣別（韓幣 ₩ / 日幣 ¥ / 台幣 NT$）換算、指定 3 種官方付款收款管道、官方特典 (POB) 明細設定與自動保留草稿。"
+        description={editingProduct
+          ? '編輯商品資訊、成員選項、收款方式與官方特典內容。'
+          : '同一團務可一次上架多款不同售價商品，個別設定是否開放選擇團員，並共用活動介紹與圖片。'}
         tag={editingProduct ? '管理員 · 編輯周邊' : '管理員 · 新增周邊'}
         actionText="← 返回後台面板"
         onActionClick={() => onNavigate('admin')}
@@ -505,7 +565,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
 
                 <div className="sm:col-span-2">
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    周邊商品完整名稱 <span className="text-rose-500">*</span>
+                    商品 1 名稱 <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -517,6 +577,79 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   />
                 </div>
               </div>
+
+              {!editingProduct && (
+                <section className="p-4 rounded-2xl border border-rose-200 bg-rose-50/40 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">同一團務的其他商品</h4>
+                      <p className="text-[11px] text-slate-500 mt-1">本表單的商品名稱和售價欄位是商品 1；其他商品會共用團體、主題、圖片和介紹。</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddAdditionalProduct}
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> 新增商品
+                    </button>
+                  </div>
+
+                  {additionalProducts.length > 0 && (
+                    <div className="space-y-3">
+                      {additionalProducts.map((item, index) => (
+                        <div key={item.id} className="p-3 bg-white rounded-xl border border-slate-200 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-700">商品 {index + 2}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAdditionalProduct(item.id)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                              aria-label={`刪除商品 ${index + 2}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_10rem] gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">商品名稱</label>
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={e => handleUpdateAdditionalProduct(item.id, { title: e.target.value })}
+                                placeholder="例：專輯 A Ver."
+                                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-rose-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">台幣售價</label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-600">NT$</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={item.price || ''}
+                                  onChange={e => handleUpdateAdditionalProduct(item.id, { price: Number(e.target.value) })}
+                                  placeholder="1280"
+                                  className="w-full pl-11 pr-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:outline-rose-500"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={item.canChooseMember}
+                              onChange={e => handleUpdateAdditionalProduct(item.id, { canChooseMember: e.target.checked })}
+                              className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
+                            />
+                            此商品開放選擇團員
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
 
               {/* CURRENCY & PRICING SECTION (KRW / JPY / TWD) */}
               <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
@@ -709,17 +842,28 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
               </div>
 
               {/* Member Options */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  可選成員款式 / 版本清單 (以逗號區隔)
+              <div className="p-4 rounded-2xl border border-slate-200 space-y-3">
+                <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={canChooseMember}
+                    onChange={e => setCanChooseMember(e.target.checked)}
+                    className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
+                  />
+                  商品 1 開放選擇團員
                 </label>
-                <input
-                  type="text"
-                  placeholder="例：娜璉, 定延, Momo, Sana, 志效, Mina, 多賢, 彩瑛, 子瑜"
-                  value={memberOptionsText}
-                  onChange={e => setMemberOptionsText(e.target.value)}
-                  className="w-full px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-rose-500"
-                />
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    團員清單（勾選可選團員的商品會共用；以逗號區隔）
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="例：娜璉, 定延, Momo, Sana, 志效, Mina, 多賢, 彩瑛, 子瑜"
+                    value={memberOptionsText}
+                    onChange={e => setMemberOptionsText(e.target.value)}
+                    className="w-full px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-rose-500"
+                  />
+                </div>
               </div>
 
               {/* MULTI-IMAGE UPLOAD & GALLERY SECTION */}
@@ -888,7 +1032,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   type="submit"
                   className="flex-1 py-3 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-rose-200 flex items-center justify-center gap-2"
                 >
-                  <span>確認發布周邊並開團 (NT$ {Number(price).toLocaleString()})</span>
+                  <span>{editingProduct ? `儲存周邊介紹 (NT$ ${Number(price).toLocaleString()})` : `一次上架 ${additionalProducts.filter(item => item.title.trim() && item.price > 0).length + 1} 款商品`}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
