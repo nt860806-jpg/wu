@@ -1,4 +1,23 @@
-import { Order } from '../types';
+import { Order, OrderItem } from '../types';
+
+export interface OrderItemCampaignGroup {
+  artist: string;
+  campaign: string;
+  items: OrderItem[];
+}
+
+export function groupOrderItemsByCampaign(items: OrderItem[], fallbackCampaign = 'Official_Campaign'): OrderItemCampaignGroup[] {
+  const groups = new Map<string, OrderItemCampaignGroup>();
+  for (const item of items) {
+    const artist = item.artist || '其他團體';
+    const campaign = item.campaign || fallbackCampaign;
+    const key = JSON.stringify([artist, campaign]);
+    const group = groups.get(key) || { artist, campaign, items: [] };
+    group.items.push(item);
+    groups.set(key, group);
+  }
+  return Array.from(groups.values());
+}
 
 /**
  * 團體縮寫對照表

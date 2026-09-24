@@ -17,7 +17,7 @@ import {
 import { Order, OrderStatus } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { BRAND_CONFIG } from '../data/mockData';
-import { cleanPobDisplay } from '../utils/orderUtils';
+import { cleanPobDisplay, groupOrderItemsByCampaign } from '../utils/orderUtils';
 
 interface OrderStatusPageProps {
   orders: Order[];
@@ -334,44 +334,53 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 本筆訂單明細 (共 {searchedOrder.items.length} 項)
               </h4>
-              <div className="divide-y divide-slate-100">
-                {searchedOrder.items.map((item, idx) => (
-                  <div key={idx} className="py-3 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                          {item.artist}
-                        </span>
-                        <h5 className="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5">
-                          {item.title}
-                        </h5>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          {item.selectedMember && (
-                            <span className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                              成員款式：<strong className="text-slate-800">{item.selectedMember}</strong>
-                            </span>
-                          )}
-                          {(item.pobPreference || searchedOrder.pobPreference) && (
-                            <span className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              特典順序：<strong>{cleanPobDisplay(item.pobPreference || searchedOrder.pobPreference)}</strong>
-                            </span>
-                          )}
+              <div className="space-y-4">
+                {groupOrderItemsByCampaign(searchedOrder.items, searchedOrder.campaign).map(group => (
+                  <section key={`${group.artist}-${group.campaign}`} className="rounded-xl border border-slate-200 overflow-hidden">
+                    <h5 className="px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700">
+                      {group.artist}・{group.campaign}
+                    </h5>
+                    <div className="divide-y divide-slate-100 px-3">
+                      {group.items.map((item, idx) => (
+                        <div key={`${item.title}-${idx}`} className="py-3 flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={item.imageUrl}
+                              alt={item.title}
+                              className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                {item.artist}
+                              </span>
+                              <h5 className="text-xs sm:text-sm font-semibold text-slate-900 mt-0.5">
+                                {item.title}
+                              </h5>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                {item.selectedMember && (
+                                  <span className="text-[11px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                                    成員款式：<strong className="text-slate-800">{item.selectedMember}</strong>
+                                  </span>
+                                )}
+                                {(item.pobPreference || searchedOrder.pobPreference) && (
+                                  <span className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                    特典順序：<strong>{cleanPobDisplay(item.pobPreference || searchedOrder.pobPreference)}</strong>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-xs text-slate-500">數量：{item.quantity}</div>
+                            <div className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
+                              NT$ {(item.price * item.quantity).toLocaleString()}
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      ))}
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-xs text-slate-500">數量：{item.quantity}</div>
-                      <div className="text-xs sm:text-sm font-bold text-slate-900 font-mono">
-                        NT$ {(item.price * item.quantity).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
+                  </section>
                 ))}
               </div>
             </div>

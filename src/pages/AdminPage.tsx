@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { Order, ShippingBatch, ActivePage, OrderStatus, AdminMember, UserProfile, Product } from '../types';
 import { PageHeader } from '../components/PageHeader';
-import { cleanPobDisplay } from '../utils/orderUtils';
+import { cleanPobDisplay, groupOrderItemsByCampaign } from '../utils/orderUtils';
 import { getTaipeiDate, isProductAvailable, supabase } from '../lib/supabase';
 import { canManageArtistGroups, useArtistGroups } from '../hooks/useArtistGroups';
 
@@ -1242,9 +1242,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                             </td>
 
                             <td className="py-3.5 px-4 max-w-xs">
-                              {order.items.map((item, idx) => (
-                                <div key={idx} className="line-clamp-1 text-slate-700">
-                                  • {item.title} <span className="text-slate-400 font-mono">({item.selectedMember || '通版'} x{item.quantity})</span>
+                              {groupOrderItemsByCampaign(order.items, order.campaign).map(group => (
+                                <div key={`${group.artist}-${group.campaign}`} className="mb-1.5">
+                                  <div className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded inline-block mb-0.5">
+                                    {group.artist}・{group.campaign}
+                                  </div>
+                                  {group.items.map((item, idx) => (
+                                    <div key={`${item.title}-${idx}`} className="line-clamp-1 text-slate-700">
+                                      • {item.title} <span className="text-slate-400 font-mono">({item.selectedMember || '通版'} x{item.quantity})</span>
+                                    </div>
+                                  ))}
                                 </div>
                               ))}
                               {order.pobPreference && (
