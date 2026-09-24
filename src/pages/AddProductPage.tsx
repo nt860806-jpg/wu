@@ -436,7 +436,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       <PageHeader
         title={editingProduct ? '編輯官方周邊介紹' : '開立全新官方周邊團務'}
         description={editingProduct
-          ? '編輯商品資訊、成員選項、收款方式與官方特典內容。'
+          ? '可更新這團商品，也能新增其他品項；新增的商品會與目前商品顯示在同一團務。'
           : '同一團務可一次上架多款不同售價商品，個別設定是否開放選擇團員，並共用活動介紹與圖片。'}
         tag={editingProduct ? '管理員 · 編輯周邊' : '管理員 · 新增周邊'}
         actionText="← 返回後台面板"
@@ -473,7 +473,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
             {submittedSuccess && (
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
                 <Check className="w-4 h-4" />
-                <span>{editingProduct ? '商品介紹已更新！' : '團務與團內商品已成功發布！'} 正在返回管理頁面...</span>
+                <span>{editingProduct ? (additionalProducts.length ? `團務商品已更新，並新增 ${additionalProducts.length} 款同團商品！` : '商品介紹已更新！') : '團務與團內商品已成功發布！'} 正在返回管理頁面...</span>
               </div>
             )}
 
@@ -576,7 +576,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     <h4 className="text-sm font-bold text-slate-900">本主題批號的商品品項</h4>
                     <p className="text-[11px] text-slate-500 mt-1">每列都是同一主題批號中的一個商品，可分別設定幣別售價與可選團員。</p>
                   </div>
-                  {!editingProduct && <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增品項</button>}
+                  <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增同團商品</button>
                 </div>
                 {[
                   { id: 'primary', title, price, krwPrice, jpyPrice, canChooseMember, memberOptionsText, primary: true },
@@ -861,7 +861,9 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   type="submit"
                   className="flex-1 py-3 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-rose-200 flex items-center justify-center gap-2"
                 >
-                  <span>{editingProduct ? `儲存周邊介紹 (NT$ ${Number(price).toLocaleString()})` : `建立 1 個團務（${additionalProducts.filter(item => item.title.trim() && item.price > 0).length + 1} 款可選商品）`}</span>
+                  <span>{editingProduct
+                    ? (additionalProducts.length ? `更新商品並新增 ${additionalProducts.length} 款同團商品` : `儲存周邊介紹 (NT$ ${Number(price).toLocaleString()})`)
+                    : `建立 1 個團務（${additionalProducts.filter(item => item.title.trim() && item.price > 0).length + 1} 款可選商品）`}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
