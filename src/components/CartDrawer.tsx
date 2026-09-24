@@ -11,10 +11,12 @@ interface CartDrawerProps {
   onUpdateQuantity: (cartItemId: string, delta: number) => void;
   onRemoveItem: (cartItemId: string) => void;
   onClearCart: () => void;
-  onCreateOrder: (order: Order) => void;
+  onCreateOrder: (order: Order, walletCreditApplied: number) => Promise<boolean>;
   onNavigateToOrder: (orderId: string) => void;
+  onNavigateToLogin: () => void;
   existingOrders?: Order[];
   currentUser?: UserProfile;
+  walletBalance?: number;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -26,8 +28,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onClearCart,
   onCreateOrder,
   onNavigateToOrder,
+  onNavigateToLogin,
   existingOrders = [],
   currentUser,
+  walletBalance = 0,
 }) => {
   const [step, setStep] = useState<'cart' | 'checkout' | 'success'>('cart');
 
@@ -48,6 +52,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [copiedBank, setCopiedBank] = useState(false);
+  const [useWalletCredit, setUseWalletCredit] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   // Sync user profile data when opening or when currentUser changes
   useEffect(() => {
@@ -73,12 +79,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   // Calculations: 下單介面不需運費，只有全額付清 (Requirement 3)
   const subtotal = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const shippingFee = 0; // 不需運費
-  const finalTotal = subtotal; // 只有全額付清
+  const walletCreditApplied = useWalletCredit ? Math.min(Math.max(walletBalance, 0), subtotal) : 0;
+  const finalTotal = subtotal - walletCreditApplied;
 
   const currentPaymentAccount = cartItems[0]?.product.paymentMethod || '全支付(389)11016053741860';
 
   const handleStartCheckout = () => {
     if (cartItems.length === 0) return;
+    if (!currentUser?.isLoggedIn) {
+      onClose();
+      onNavigateToLogin();
+      return;
+    }
     setStep('checkout');
   };
 
@@ -96,9 +108,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     onClose();
   };
 
-  const handleSubmitOrder = (e: React.FormEvent) => {
+  const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+
+    if (!currentUser?.isLoggedIn) {
+      setErrorMessage('請先登入會員，才能建立可同步的訂單並使用購物金。');
+      return;
+    }
 
     if (!customerName.trim()) {
       setErrorMessage('請填寫訂購人姓名 (與證件相符以便超商核對)');
@@ -150,7 +167,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       customerName: customerName.trim(),
       socialNickname: socialNickname.trim(),
       phone: phone.trim(),
-      email: email.trim() || currentUser?.email || '未提供',
+      email: currentUser.email,
       items: orderItems,
       subtotal,
       shippingFee: 0, // 不需運費
@@ -168,10 +185,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       notes: orderNotes.trim(),
       pobPreference: finalPobPref,
       secondPaymentAmount: 0,
-      paymentAccount: activePaymentAccount
+      paymentAccount: activePaymentAccount,
+      walletCreditApplied,
     };
 
-    onCreateOrder(newOrder);
+    setIsSubmittingOrder(true);
+    const saved = await onCreateOrder(newOrder, walletCreditApplied);
+    setIsSubmittingOrder(false);
+    if (!saved) {
+      setErrorMessage('訂單尚未成功儲存，請稍後再試；購物金尚未扣除。');
+      return;
+    }
     setCreatedOrder(newOrder);
     onClearCart();
     setStep('success');
@@ -323,6 +347,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
               )}
 
+              {!currentUser?.isLoggedIn && (
+                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between gap-3">
+                  <span>請先登入會員，確保訂單、取消通知和購物金能同步保存。</span>
+                  <button type="button" onClick={onNavigateToLogin} className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold">前往登入</button>
+                </div>
+              )}
+
               {/* 1. Recipient Information (會員自動帶入) */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -391,6 +422,24 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2 text-xs">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useWalletCredit}
+                      disabled={walletBalance <= 0}
+                      onChange={e => setUseWalletCredit(e.target.checked)}
+                      className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
+                    />
+                    使用購物金折抵
+                  </label>
+                  <span className="font-mono font-bold text-amber-800">可用 NT$ {walletBalance.toLocaleString()}</span>
+                </div>
+                {walletCreditApplied > 0 && <p className="text-emerald-700">本次折抵 NT$ {walletCreditApplied.toLocaleString()}</p>}
+                {walletBalance <= 0 && <p className="text-[11px] text-slate-500">目前沒有可用購物金。</p>}
               </div>
 
               {/* 2. POB Member Preference: 預設志願順序選項留「不挑成員」及「自訂」 (Requirement 3 & 4) */}
@@ -532,8 +581,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <span>跟團配送重要守則 (同意以下事項再填單)</span>
                 </div>
                 <div className="text-[11px] text-slate-300 space-y-1 leading-relaxed border-t border-slate-800 pt-2 font-sans">
-                  <p>•下單後不接受取消， 棄單者會列入黑名單 **</p>
-                  <p>•按表單順序出貨 (未購買到的如有海外手續費會扣除後再進行退款)</p>
+                  <p>•已成立訂單不提供一般取消；若官方未能購得商品，團長會通知您選擇轉購物金或聯繫官方帳號退款。</p>
+                  <p>•購物金可於下次消費折抵；選擇退款請自行聯繫官方帳號辦理。</p>
                   <p>•先匯總金額，二補開賣貨便</p>
                   <p>•默認廠損及運輸瑕</p>
                   <p>•物流不保證速度，請耐心等候</p>
@@ -566,10 +615,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-rose-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  disabled={isSubmittingOrder || !currentUser?.isLoggedIn}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 disabled:opacity-50 text-white text-xs sm:text-sm font-bold shadow-md shadow-rose-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
-                  <span>確認送出團務訂單 (全額 NT$ {finalTotal.toLocaleString()})</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>{isSubmittingOrder ? '訂單儲存中…' : `確認送出團務訂單 (應付 NT$ ${finalTotal.toLocaleString()})`}</span>
+                  {!isSubmittingOrder && <ArrowRight className="w-4 h-4" />}
                 </button>
               </div>
             </form>

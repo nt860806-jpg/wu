@@ -77,6 +77,8 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
   // Helper for order status badge
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
+      case 'cancelled':
+        return { text: '訂單已取消', color: 'bg-rose-50 text-rose-800 border-rose-200' };
       case 'order_created':
       case 'pending_payment':
         return { text: '1. 訂單成立 (等待轉帳)', color: 'bg-amber-50 text-amber-800 border-amber-200' };
@@ -244,6 +246,15 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
               </div>
             </div>
 
+            {searchedOrder.orderStatus === 'cancelled' ? (
+              <div className="p-6 bg-rose-50 border-y border-rose-100">
+                <h4 className="font-bold text-rose-900">這筆訂單已取消</h4>
+                <p className="text-xs text-rose-800 mt-1">{searchedOrder.cancellationReason || '商品未能購得。請登入會員中心選擇轉為購物金，或自行聯繫官方帳號辦理退款。'}</p>
+                {searchedOrder.cancellationStatus === 'wallet_credited' && <p className="text-xs font-bold text-emerald-800 mt-2">已轉入購物金 NT$ {(searchedOrder.walletCreditAmount || 0).toLocaleString()}。</p>}
+                {searchedOrder.cancellationStatus === 'refund_contact_requested' && <p className="text-xs font-bold text-blue-800 mt-2">已記錄退款需求，請聯繫官方帳號處理。</p>}
+                {searchedOrder.cancellationStatus === 'refund_completed' && <p className="text-xs font-bold text-emerald-800 mt-2">退款已完成。</p>}
+              </div>
+            ) : <>
             {/* Stepper Timeline */}
             <div className="p-6 sm:p-8 overflow-x-auto">
               <div className="flex items-center justify-between mb-4">
@@ -328,6 +339,7 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
                 </form>
               </div>
             </div>
+            </>}
 
             {/* Items Ordered List */}
             <div className="p-6 space-y-4">

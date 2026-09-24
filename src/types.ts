@@ -73,6 +73,7 @@ export type OrderStatus =
   | 'taiwan_customs_sorting'   // 抵台品檢理貨
   | 'domestic_shipping'        // 超商寄送
   | 'completed'                // 取件完成
+  | 'cancelled'                // 商品未買到，訂單取消
   // Legacy compatibility
   | 'pending_payment'
   | 'paid_verifying'
@@ -123,6 +124,25 @@ export interface Order {
   pobPreference?: string; // 整筆訂單之特典順序
   secondPaymentAmount?: number; // 二補金額 (NT$)
   paymentAccount?: string; // 實際付款帳號名稱 (如 全支付(389)11016053741860 等)
+  cancellationStatus?: 'none' | 'awaiting_choice' | 'wallet_credited' | 'refund_contact_requested' | 'refund_completed';
+  cancellationReason?: string;
+  cancelledAt?: string;
+  cancellationResolvedAt?: string;
+  walletCreditAmount?: number;
+  walletCreditApplied?: number;
+  restoredWalletAmount?: number;
+  refundCompletedAt?: string;
+  cancelledBy?: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  ownerEmail: string;
+  orderId?: string;
+  amount: number;
+  transactionType: 'cancellation_credit' | 'purchase_redemption' | 'refund_wallet_restore';
+  description: string;
+  createdAt: string;
 }
 
 export interface ShippingBatch {

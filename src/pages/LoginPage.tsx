@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   Tag
 } from 'lucide-react';
-import { UserProfile, ActivePage, Order, OrderStatus } from '../types';
+import { UserProfile, ActivePage, Order, OrderStatus, WalletTransaction } from '../types';
 import { MOCK_USERS } from '../data/mockData';
 import { PageHeader } from '../components/PageHeader';
 import { supabase } from '../lib/supabase';
@@ -25,6 +25,9 @@ import { groupOrderItemsByCampaign } from '../utils/orderUtils';
 interface LoginPageProps {
   currentUser: UserProfile;
   orders: Order[];
+  walletTransactions: WalletTransaction[];
+  walletBalance: number;
+  onChooseCancellationResolution: (orderId: string, resolution: 'store_credit' | 'refund_contact') => Promise<boolean>;
   onSetUser: (user: UserProfile) => void;
   onNavigate: (page: ActivePage) => void;
   onOpenShare: () => void;
@@ -60,6 +63,9 @@ const getFavoriteArtistLabel = () => {
 export const LoginPage: React.FC<LoginPageProps> = ({
   currentUser,
   orders,
+  walletTransactions,
+  walletBalance,
+  onChooseCancellationResolution,
   onSetUser,
   onNavigate,
   onOpenShare,
@@ -75,6 +81,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [selectedHistoryTab, setSelectedHistoryTab] = useState<'all' | 'unpaid' | 'transit' | 'shipping'>('all');
+  const [resolvingOrderId, setResolvingOrderId] = useState('');
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,6 +172,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   });
 
   const filteredHistoryOrders = memberOrders.filter(o => {
+    if (o.cancellationStatus && o.cancellationStatus !== 'none' && selectedHistoryTab !== 'all') return false;
     if (selectedHistoryTab === 'unpaid' && o.paymentStatus === 'paid') return false;
     if (selectedHistoryTab === 'transit' && (o.orderStatus !== 'flight_transit' && o.orderStatus !== 'shipped_kr' && o.orderStatus !== 'warehouse')) return false;
     if (selectedHistoryTab === 'shipping' && (o.orderStatus !== 'domestic_shipping' && o.orderStatus !== 'taiwan_customs_sorting')) return false;
@@ -179,9 +187,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     return true;
   });
 
-  const totalSpent = memberOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+  const totalSpent = memberOrders.filter(order => order.orderStatus !== 'cancelled').reduce((sum, o) => sum + o.totalAmount, 0);
+  const ownWalletTransactions = walletTransactions.filter(transaction => transaction.ownerEmail.toLowerCase() === currentUser.email.toLowerCase());
+
+  const handleChooseCancellation = async (orderId: string, resolution: 'store_credit' | 'refund_contact') => {
+    setResolvingOrderId(orderId);
+    await onChooseCancellationResolution(orderId, resolution);
+    setResolvingOrderId('');
+  };
 
   const getOrderStatusBadge = (status: OrderStatus) => {
+    if (status === 'cancelled') return { label: '訂單已取消', badgeColor: 'bg-rose-50 text-rose-800 border-rose-200' };
     const step = ORDER_FLOW_STEPS.find(s => s.status === status);
     if (step) {
       return { label: step.label, badgeColor: step.badgeColor };
@@ -250,6 +266,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     {getFavoriteArtistLabel()}
                   </strong>
                 </div>
+              </div>
+              <div className="p-4 bg-amber-50/80 rounded-2xl border border-amber-200 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-700">會員購物金</span>
+                  <strong className="text-lg font-mono text-amber-800">NT$ {walletBalance.toLocaleString()}</strong>
+                </div>
+                <p className="text-[11px] text-slate-500">購物金可於下次結帳折抵；退款需自行聯繫官方帳號。</p>
+                {ownWalletTransactions.length > 0 && (
+                  <div className="pt-2 border-t border-amber-200 space-y-1.5">
+                    {ownWalletTransactions.slice(0, 5).map(transaction => (
+                      <div key={transaction.id} className="flex justify-between gap-3 text-[11px]">
+                        <span className="text-slate-600">{transaction.description}{transaction.orderId ? ` · ${transaction.orderId}` : ''}</span>
+                        <strong className={transaction.amount > 0 ? 'text-emerald-700' : 'text-slate-700'}>{transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString()}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               {currentUser.isLoggedIn && <button type="button" onClick={() => supabase.auth.signOut()} className="px-4 py-2 rounded-xl border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50">登出會員帳號</button>}
             </div>
@@ -505,6 +538,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         </section>
                       ))}
                     </div>
+
+                    {order.cancellationStatus && order.cancellationStatus !== 'none' && (
+                      <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 space-y-3">
+                        <div>
+                          <div className="font-bold text-rose-900">商品未能購得，這筆訂單已取消</div>
+                          <p className="text-[11px] text-rose-800 mt-1">{order.cancellationReason || '請選擇將款項轉為購物金，或自行聯繫官方帳號辦理退款。'}</p>
+                        </div>
+                        {order.cancellationStatus === 'awaiting_choice' && (
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" disabled={resolvingOrderId === order.id} onClick={() => void handleChooseCancellation(order.id, 'store_credit')} className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold">
+                              轉為購物金 NT$ {(order.subtotal || order.totalAmount).toLocaleString()}
+                            </button>
+                            <button type="button" disabled={resolvingOrderId === order.id} onClick={() => void handleChooseCancellation(order.id, 'refund_contact')} className="px-3 py-2 rounded-lg bg-white border border-rose-300 text-rose-800 text-xs font-bold disabled:opacity-50">
+                              自行聯繫官方帳號退款
+                            </button>
+                          </div>
+                        )}
+                        {order.cancellationStatus === 'wallet_credited' && <p className="text-xs font-bold text-emerald-800">已轉入購物金 NT$ {(order.walletCreditAmount || 0).toLocaleString()}，可在下次結帳折抵。</p>}
+                        {order.cancellationStatus === 'refund_contact_requested' && (
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-rose-900">
+                            <span>已記錄您選擇退款；請聯繫官方帳號，處理進度會同步更新於此。</span>
+                            <button type="button" onClick={() => onNavigate('contact')} className="px-3 py-1.5 rounded-lg bg-white border border-rose-300 font-bold">前往聯絡方式</button>
+                          </div>
+                        )}
+                        {order.cancellationStatus === 'refund_completed' && <p className="text-xs font-bold text-emerald-800">後台已標記退款處理完成。</p>}
+                      </div>
+                    )}
 
                     {/* Footer / Summary row */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 bg-slate-50/50 p-3 rounded-xl">

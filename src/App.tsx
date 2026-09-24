@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ActivePage, Product, Order, ShippingBatch, CartItem, UserProfile, OrderStatus } from './types';
+import { ActivePage, Product, Order, ShippingBatch, CartItem, UserProfile, OrderStatus, WalletTransaction } from './types';
 import { 
   INITIAL_PRODUCTS, 
   INITIAL_SHIPPING_BATCHES, 
@@ -37,6 +37,7 @@ export default function App() {
     const saved = localStorage.getItem('jyp_select_orders');
     return saved ? JSON.parse(saved) : INITIAL_ORDERS;
   });
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
 
   const [batches, setBatches] = useState<ShippingBatch[]>(() => {
     const saved = localStorage.getItem('jyp_select_batches');
@@ -118,6 +119,70 @@ export default function App() {
   }, [orders]);
 
   useEffect(() => {
+    if (!currentUser.isLoggedIn || !currentUser.email || currentUser.email === '尚未登入') {
+      setWalletTransactions([]);
+      return;
+    }
+    let active = true;
+    const email = currentUser.email.toLowerCase();
+    const isAdmin = ADMIN_EMAILS.includes(email);
+
+    const mapOrderRows = (rows: { data: Order; cancellation_status: Order['cancellationStatus'] }[]) =>
+      rows.map(row => ({ ...row.data, cancellationStatus: row.cancellation_status || row.data.cancellationStatus || 'none' }));
+    const loadCloudOrders = async () => {
+      const { data, error } = await supabase.from('orders').select('data,cancellation_status').order('created_at', { ascending: false });
+      if (!error && data && active) setOrders(mapOrderRows(data as { data: Order; cancellation_status: Order['cancellationStatus'] }[]));
+    };
+    const loadWallet = async () => {
+      const { data, error } = await supabase.from('wallet_transactions').select('id,owner_email,order_id,amount,transaction_type,description,created_at').order('created_at', { ascending: false });
+      if (!error && data && active) {
+        setWalletTransactions(data.map(row => ({
+          id: row.id,
+          ownerEmail: row.owner_email,
+          orderId: row.order_id || undefined,
+          amount: row.amount,
+          transactionType: row.transaction_type,
+          description: row.description,
+          createdAt: row.created_at,
+        })));
+      }
+    };
+
+    const syncLegacyLocalOrders = async () => {
+      let localOrders: Order[] = [];
+      try {
+        const raw = localStorage.getItem('jyp_select_orders');
+        localOrders = raw ? JSON.parse(raw) as Order[] : [];
+      } catch {
+        localOrders = [];
+      }
+      const migratable = localOrders.filter(order => {
+        const ownerEmail = order.email?.trim().toLowerCase() || '';
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail) && (isAdmin || ownerEmail === email);
+      });
+      if (migratable.length) {
+        await supabase.from('orders').upsert(migratable.map(order => ({
+          id: order.id,
+          owner_email: order.email!.trim().toLowerCase(),
+          data: { ...order, cancellationStatus: order.cancellationStatus || 'none' },
+          cancellation_status: order.cancellationStatus || 'none',
+        })), { onConflict: 'id', ignoreDuplicates: true });
+      }
+      await Promise.all([loadCloudOrders(), loadWallet()]);
+    };
+
+    void syncLegacyLocalOrders();
+    const channel = supabase.channel(`member-orders-wallet-${email}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { void loadCloudOrders(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wallet_transactions' }, () => { void loadWallet(); })
+      .subscribe();
+    return () => {
+      active = false;
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUser.email, currentUser.isLoggedIn, currentUser.role]);
+
+  useEffect(() => {
     localStorage.setItem('jyp_select_batches', JSON.stringify(batches));
   }, [batches]);
 
@@ -185,12 +250,22 @@ export default function App() {
   };
 
   // Order operations
-  const handleCreateOrder = (newOrder: Order) => {
-    setOrders(prev => [newOrder, ...prev]);
+  const handleCreateOrder = async (newOrder: Order, walletCreditApplied: number): Promise<boolean> => {
+    const { data, error } = await supabase.rpc('create_member_order', {
+      p_order: newOrder,
+      p_wallet_apply: walletCreditApplied,
+    });
+    if (error || !data) {
+      window.alert(error?.message || '訂單建立失敗，請稍後再試。');
+      return false;
+    }
+    const savedOrder = { ...newOrder, ...(data as Partial<Order>) };
+    setOrders(prev => [savedOrder, ...prev.filter(order => order.id !== savedOrder.id)]);
     setCurrentUser(prev => ({
       ...prev,
       accumulatedOrders: (prev.accumulatedOrders || 0) + 1,
     }));
+    return true;
   };
 
   const handleNavigateToOrder = (orderId: string) => {
@@ -198,14 +273,10 @@ export default function App() {
     handleNavigate('order-status');
   };
 
-  const handleUpdateOrderBankCode = (orderId: string, bankLastFive: string) => {
-    setOrders(prev =>
-      prev.map(o =>
-        o.id === orderId
-          ? { ...o, bankLastFive, orderStatus: 'paid_verifying' }
-          : o
-      )
-    );
+  const handleUpdateOrderBankCode = async (orderId: string, bankLastFive: string) => {
+    const { data, error } = await supabase.rpc('submit_order_bank_code', { p_order_id: orderId, p_bank_last_five: bankLastFive });
+    if (error) { window.alert(error.message); return; }
+    if (data) setOrders(prev => prev.map(order => order.id === orderId ? { ...order, ...(data as Partial<Order>) } : order));
   };
 
   const handleUpdateOrderStatus = (orderId: string, status: OrderStatus, trackingNumber?: string) => {
@@ -222,12 +293,74 @@ export default function App() {
         return o;
       })
     );
+    const order = orders.find(item => item.id === orderId);
+    if (order) {
+      const updated = {
+        ...order,
+        orderStatus: status,
+        trackingNumber: trackingNumber || order.trackingNumber,
+        paymentStatus: status === 'confirmed' || status === 'shipped' || status === 'completed' || status === 'domestic_shipping' ? 'paid' : order.paymentStatus,
+      };
+      void supabase.from('orders').update({ data: updated, updated_at: new Date().toISOString() }).eq('id', orderId);
+    }
   };
 
   const handleUpdateOrderDetails = (orderId: string, updates: Partial<Order>) => {
-    setOrders(prev =>
-      prev.map(o => (o.id === orderId ? { ...o, ...updates } : o))
-    );
+    const existing = orders.find(order => order.id === orderId);
+    if (!existing) return;
+    const updated = { ...existing, ...updates };
+    setOrders(prev => prev.map(order => order.id === orderId ? updated : order));
+    void supabase.from('orders').update({
+      data: updated,
+      cancellation_status: updated.cancellationStatus || 'none',
+      updated_at: new Date().toISOString(),
+    }).eq('id', orderId).then(({ error }) => {
+      if (error) window.alert(`訂單更新失敗：${error.message}`);
+    });
+  };
+
+  const handleCancelOrderForNoStock = async (orderId: string): Promise<boolean> => {
+    if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return false;
+    const order = orders.find(item => item.id === orderId);
+    if (!order) return false;
+    const updated: Order = {
+      ...order,
+      orderStatus: 'cancelled',
+      cancellationStatus: 'awaiting_choice',
+      cancellationReason: '商品未能向官方購得，請選擇轉為購物金或自行聯繫官方帳號退款。',
+      cancelledAt: new Date().toISOString(),
+      cancelledBy: currentUser.email,
+    };
+    const { error } = await supabase.from('orders').update({
+      data: updated,
+      cancellation_status: 'awaiting_choice',
+      updated_at: new Date().toISOString(),
+    }).eq('id', orderId);
+    if (error) { window.alert(`取消訂單失敗：${error.message}`); return false; }
+    setOrders(prev => prev.map(item => item.id === orderId ? updated : item));
+    return true;
+  };
+
+  const handleCancellationResolution = async (orderId: string, resolution: 'store_credit' | 'refund_contact'): Promise<boolean> => {
+    const { error } = await supabase.rpc('choose_order_cancellation_resolution', { p_order_id: orderId, p_resolution: resolution });
+    if (error) { window.alert(error.message); return false; }
+    const [ordersResult, walletResult] = await Promise.all([
+      supabase.from('orders').select('data,cancellation_status').order('created_at', { ascending: false }),
+      supabase.from('wallet_transactions').select('id,owner_email,order_id,amount,transaction_type,description,created_at').order('created_at', { ascending: false }),
+    ]);
+    if (ordersResult.data) setOrders(ordersResult.data.map(row => ({ ...row.data as Order, cancellationStatus: row.cancellation_status || 'none' })));
+    if (walletResult.data) setWalletTransactions(walletResult.data.map(row => ({ id: row.id, ownerEmail: row.owner_email, orderId: row.order_id || undefined, amount: row.amount, transactionType: row.transaction_type, description: row.description, createdAt: row.created_at })));
+    return true;
+  };
+
+  const handleMarkRefundCompleted = (orderId: string) => {
+    const order = orders.find(item => item.id === orderId);
+    if (!order || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return;
+    handleUpdateOrderDetails(orderId, {
+      cancellationStatus: 'refund_completed',
+      refundCompletedAt: new Date().toISOString(),
+      cancellationResolvedAt: new Date().toISOString(),
+    });
   };
 
   // Batch Multi-Order Update
@@ -235,6 +368,12 @@ export default function App() {
     setOrders(prev =>
       prev.map(o => (orderIds.includes(o.id) ? { ...o, ...updates } : o))
     );
+    const affected = orders.filter(order => orderIds.includes(order.id));
+    void Promise.all(affected.map(order => supabase.from('orders').update({
+      data: { ...order, ...updates },
+      cancellation_status: updates.cancellationStatus || order.cancellationStatus || 'none',
+      updated_at: new Date().toISOString(),
+    }).eq('id', order.id)));
   };
 
   // Synchronized Batch & Orders Status Update
@@ -283,7 +422,7 @@ export default function App() {
     // 2. Synchronize all orders belonging to this batch
     setOrders(prev =>
       prev.map(o => {
-        if (o.batchCode === targetBatch.batchCode) {
+        if (o.batchCode === targetBatch.batchCode && o.orderStatus !== 'cancelled') {
           return {
             ...o,
             orderStatus: newStatus,
@@ -293,6 +432,15 @@ export default function App() {
         return o;
       })
     );
+    const batchOrders = orders.filter(order => order.batchCode === targetBatch.batchCode && order.orderStatus !== 'cancelled');
+    void Promise.all(batchOrders.map(order => supabase.from('orders').update({
+      data: {
+        ...order,
+        orderStatus: newStatus,
+        paymentStatus: (newStatus === 'domestic_shipping' || newStatus === 'taiwan_customs_sorting' || newStatus === 'flight_transit') ? 'paid' : order.paymentStatus,
+      },
+      updated_at: new Date().toISOString(),
+    }).eq('id', order.id)));
   };
 
   const handleAdvanceBatchStatus = (batchId: string) => {
@@ -400,6 +548,11 @@ export default function App() {
 
   const shareInfo = getShareInfo();
   const totalCartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const walletBalance = currentUser.isLoggedIn
+    ? walletTransactions
+        .filter(transaction => transaction.ownerEmail.toLowerCase() === currentUser.email.toLowerCase())
+        .reduce((sum, transaction) => sum + transaction.amount, 0)
+    : 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FBFBFB] text-slate-900 font-sans">
@@ -466,10 +619,13 @@ export default function App() {
           <AdminPage
             products={products}
             orders={orders}
+            walletTransactions={walletTransactions}
             batches={batches}
             onNavigate={handleNavigate}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             onUpdateOrderDetails={handleUpdateOrderDetails}
+            onCancelOrder={handleCancelOrderForNoStock}
+            onMarkRefundCompleted={handleMarkRefundCompleted}
             onBatchUpdateOrders={handleBatchUpdateOrders}
             onAdvanceBatchStatus={handleAdvanceBatchStatus}
             onUpdateBatchStatus={handleUpdateBatchStatus}
@@ -498,6 +654,9 @@ export default function App() {
           <LoginPage
             currentUser={currentUser}
             orders={orders}
+            walletTransactions={walletTransactions}
+            walletBalance={walletBalance}
+            onChooseCancellationResolution={handleCancellationResolution}
             onSetUser={setCurrentUser}
             onNavigate={handleNavigate}
             onOpenShare={() => setIsShareModalOpen(true)}
@@ -531,6 +690,10 @@ export default function App() {
         onClearCart={handleClearCart}
         onCreateOrder={handleCreateOrder}
         onNavigateToOrder={handleNavigateToOrder}
+        onNavigateToLogin={() => { setIsCartOpen(false); handleNavigate('login'); }}
+        currentUser={currentUser}
+        existingOrders={orders}
+        walletBalance={walletBalance}
       />
 
       {/* Social Share Preview Modal (Threads & Facebook) */}
