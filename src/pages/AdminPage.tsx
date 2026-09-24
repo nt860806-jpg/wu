@@ -762,14 +762,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onNavigate('add-product')}
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-xl border border-rose-200 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>新增官方周邊 (Artist &gt; Campaign)</span>
-          </button>
         </div>
 
         {/* REQUIREMENT 1: 權限提示橫幅 (所有修改功能只有管理員有權限) */}
