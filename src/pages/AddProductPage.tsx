@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Sparkles, 
   Plus, 
@@ -22,6 +22,7 @@ import {
 import { Product, Artist, ProductCategory, ActivePage, UserProfile } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { useArtistGroups } from '../hooks/useArtistGroups';
+import { supabase } from '../lib/supabase';
 
 interface AddProductPageProps {
   onAddProduct: (product: Product) => Promise<boolean>;
@@ -78,7 +79,9 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
           'https://images.unsplash.com/photo-1551028719-00167b16eac5?q=80&w=1000&auto=format&fit=crop'
         ]
   );
-  const [newImageUrl, setNewImageUrl] = useState('');
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState('');
+  const imageFileInput = useRef<HTMLInputElement>(null);
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
 
   const [pobDetail, setPobDetail] = useState(
@@ -196,11 +199,43 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     setTimeout(() => setDraftSavedTip(false), 2000);
   };
 
-  // Add an image to gallery
-  const handleAddImage = () => {
-    if (!newImageUrl.trim()) return;
-    setGalleryImages(prev => [...prev, newImageUrl.trim()]);
-    setNewImageUrl('');
+  // Upload selected images to shared Supabase Storage so every visitor/device can load them.
+  const handleImageFilesSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files: File[] = event.target.files ? Array.from(event.target.files) as File[] : [];
+    event.target.value = '';
+    if (!files.length) return;
+    setImageUploadError('');
+    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    if (files.some(file => !allowedTypes.has(file.type) || file.size > 10 * 1024 * 1024)) {
+      setImageUploadError('請選擇 JPG、PNG、WebP 或 GIF 圖片，每張不可超過 10 MB。');
+      return;
+    }
+    if (galleryImages.length + files.length > 12) {
+      setImageUploadError('一個商品最多可放 12 張圖片。');
+      return;
+    }
+
+    setIsUploadingImages(true);
+    const uploadedUrls: string[] = [];
+    try {
+      for (const file of files) {
+        const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+        const path = `${crypto.randomUUID()}.${extension}`;
+        const { error } = await supabase.storage.from('product-images').upload(path, file, {
+          cacheControl: '3600',
+          contentType: file.type,
+          upsert: false,
+        });
+        if (error) throw error;
+        uploadedUrls.push(supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl);
+      }
+      setGalleryImages(prev => [...prev, ...uploadedUrls]);
+    } catch (error) {
+      console.error('Product image upload failed', error);
+      setImageUploadError('圖片上傳失敗，請確認網路後再試一次。');
+    } finally {
+      setIsUploadingImages(false);
+    }
   };
 
   const handleRemoveImage = (indexToRemove: number) => {
@@ -697,24 +732,35 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   <span className="text-[11px] text-slate-500">支援首圖與細節圖切換</span>
                 </div>
 
-                {/* Input for adding new image */}
-                <div className="flex gap-2">
+                {/* Upload image files directly from this device */}
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
-                    type="url"
-                    placeholder="請輸入商品圖片網址 (URL)"
-                    value={newImageUrl}
-                    onChange={e => setNewImageUrl(e.target.value)}
-                    className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:outline-rose-500 font-mono"
+                    ref={imageFileInput}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    onChange={handleImageFilesSelected}
+                    className="sr-only"
                   />
                   <button
                     type="button"
-                    onClick={handleAddImage}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shrink-0 flex items-center gap-1"
+                    onClick={() => imageFileInput.current?.click()}
+                    disabled={isUploadingImages || galleryImages.length >= 12}
+                    className="flex-1 min-h-12 px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-600 text-left text-xs sm:text-sm hover:border-rose-300 disabled:opacity-60"
+                  >
+                    {isUploadingImages ? '圖片上傳中…' : '選擇商品圖片檔案（可複選，單張上限 10 MB）'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => imageFileInput.current?.click()}
+                    disabled={isUploadingImages || galleryImages.length >= 12}
+                    className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs sm:text-sm font-bold shrink-0 flex items-center justify-center gap-1 disabled:opacity-60"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>新增圖片</span>
+                    <span>{isUploadingImages ? '上傳中' : '上傳圖片'}</span>
                   </button>
                 </div>
+                {imageUploadError && <p role="alert" className="text-xs font-semibold text-rose-700">{imageUploadError}</p>}
 
                 {/* Quick Presets */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
