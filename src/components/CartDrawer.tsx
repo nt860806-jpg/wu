@@ -196,7 +196,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 {step === 'success' && '團務訂單已成功建立！'}
               </h3>
               <p className="text-xs text-slate-500">
-                {step === 'cart' && `共 ${cartItems.length} 項官方周邊商品（免本島運費・全額付清）`}
+                {step === 'cart' && `共 ${cartItems.length} 項官方周邊商品（商品金額全額付清）`}
                 {step === 'checkout' && '已自動帶入會員資料，付款方式為全支付轉帳'}
                 {step === 'success' && '請保存專屬訂單編號，可於會員中心追蹤'}
               </p>
@@ -299,14 +299,13 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     ))}
                   </div>
 
-                  {/* Payment Policy Notice: 一次全額付清・不需運費 */}
+                  {/* Payment and shipping notice */}
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-1">
                     <div className="flex items-center justify-between font-bold text-slate-900">
                       <span>跟團付款方式：全額付清</span>
-                      <span className="text-emerald-600">免收取台灣運費</span>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                      跟團採一次全額付清商品金額，第一階段無需支付本島運費。待周邊抵台理貨完成後，將開立「7-11 賣貨便」專屬賣場收取二補運費並安排超商取件。
+                      跟團時先付清商品金額；周邊抵台理貨完成後，會開立「7-11 賣貨便」專屬賣場另收運費並安排超商取件。
                     </p>
                   </div>
                 </div>
@@ -649,9 +648,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 <span>商品小計 ({cartItems.reduce((s, i) => s + i.quantity, 0)} 件)</span>
                 <span className="font-mono font-medium">NT$ {subtotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-emerald-600 font-medium">
+              <div className="flex justify-between text-slate-600 font-medium">
                 <span>本島運費</span>
-                <span>免運費（抵台開立賣貨便收取二補）</span>
+                <span>抵台後另收</span>
               </div>
               <div className="flex justify-between text-slate-900 text-sm font-bold pt-2 border-t border-slate-200">
                 <span>全額付清總計</span>
