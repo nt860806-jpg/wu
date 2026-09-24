@@ -13,8 +13,6 @@ import {
   ArrowRight,
   Trash2,
   RotateCcw,
-  Globe2,
-  Calculator,
   CreditCard,
   ShieldAlert,
   Lock
@@ -40,7 +38,10 @@ interface AdditionalProductDraft {
   id: string;
   title: string;
   price: number;
+  krwPrice: number;
+  jpyPrice: number;
   canChooseMember: boolean;
+  memberOptionsText: string;
 }
 
 export const AddProductPage: React.FC<AddProductPageProps> = ({
@@ -101,7 +102,15 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     editingProduct ? Boolean(editingProduct.memberOptions?.length) : savedDraft?.canChooseMember ?? true
   );
   const [additionalProducts, setAdditionalProducts] = useState<AdditionalProductDraft[]>(
-    editingProduct ? [] : savedDraft?.additionalProducts || []
+    editingProduct ? [] : (savedDraft?.additionalProducts || []).map((item: Partial<AdditionalProductDraft>) => ({
+      id: item.id || `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: item.title || '',
+      price: item.price || 0,
+      krwPrice: item.krwPrice || 0,
+      jpyPrice: item.jpyPrice || 0,
+      canChooseMember: item.canChooseMember || false,
+      memberOptionsText: item.memberOptionsText || '',
+    }))
   );
   const [description, setDescription] = useState(
     editingProduct?.description || savedDraft?.description || 'JYP 官方原廠授權正版商品。所有訂單直接向首爾官方鎖定配額，首週保證反映韓國銷量榜單。'
@@ -270,7 +279,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
   const handleAddAdditionalProduct = () => {
     setAdditionalProducts(prev => [
       ...prev,
-      { id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: '', price: Number(price) || 0, canChooseMember: true }
+      { id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: '', price: 0, krwPrice: 0, jpyPrice: 0, canChooseMember: false, memberOptionsText: '' }
     ]);
   };
 
@@ -289,16 +298,18 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       return;
     }
     setSubmitError('');
-    if (!title.trim() || Number(price) <= 0) return;
-    if (additionalProducts.some(item => !item.title.trim() || item.price <= 0)) {
-      setSubmitError('請填寫每個新增商品的名稱和有效售價，或刪除未完成的商品列。');
+    const productDrafts = [
+      { id: 'primary', title, price, krwPrice, jpyPrice, canChooseMember, memberOptionsText },
+      ...additionalProducts,
+    ];
+    if (productDrafts.some(item => !item.title.trim() || item.price <= 0)) {
+      setSubmitError('請填寫每個品項的商品名稱和台幣售價。');
       return;
     }
-
-    const memberOptions = memberOptionsText
-      .split(/[,，\n]/)
-      .map(s => s.trim())
-      .filter(Boolean);
+    if (productDrafts.some(item => item.canChooseMember && !item.memberOptionsText.split(/[,，\n]/).some(member => member.trim()))) {
+      setSubmitError('已勾選可選團員的商品，請填入該商品可選的團員名單。');
+      return;
+    }
 
     const primaryImage = galleryImages[0] || 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000&auto=format&fit=crop';
 
@@ -324,28 +335,17 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     };
 
     const now = Date.now();
-    const productsToPublish: Product[] = [
-      {
+    const productsToPublish: Product[] = productDrafts.map((item, index) => ({
         ...commonProductFields,
-        id: editingProduct?.id || `prod-${now}-1`,
-        title: title.trim(),
-        price: Number(price),
-        originalPrice: Math.round(Number(price) * 1.15),
-        krwPrice: krwPrice ? Number(krwPrice) : undefined,
-        jpyPrice: jpyPrice ? Number(jpyPrice) : undefined,
-        targetUnits: Number(targetUnits) || 50,
-        memberOptions: canChooseMember ? memberOptions : [],
-      },
-      ...(editingProduct ? [] : additionalProducts.map((item, index) => ({
-        ...commonProductFields,
-        id: `prod-${now}-${index + 2}`,
+        id: index === 0 && editingProduct ? editingProduct.id : `prod-${now}-${index + 1}`,
         title: item.title.trim(),
         price: Number(item.price),
         originalPrice: Math.round(Number(item.price) * 1.15),
+        krwPrice: item.krwPrice ? Number(item.krwPrice) : undefined,
+        jpyPrice: item.jpyPrice ? Number(item.jpyPrice) : undefined,
         targetUnits: Number(targetUnits) || 50,
-        memberOptions: item.canChooseMember ? memberOptions : [],
-      })))
-    ];
+        memberOptions: item.canChooseMember ? item.memberOptionsText.split(/[,，\n]/).map(member => member.trim()).filter(Boolean) : [],
+      }));
 
     for (const [index, product] of productsToPublish.entries()) {
       const saved = editingProduct && index === 0 && onUpdateProduct
@@ -543,9 +543,9 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 </p>
               </div>
 
-              {/* Category & Title */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-1">
+              {/* Category and group target shared by this theme's products */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     商品類別 <span className="text-rose-500">*</span>
                   </label>
@@ -562,199 +562,51 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     <option value="服飾生活周邊">服飾生活配件周邊</option>
                   </select>
                 </div>
-
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    商品 1 名稱 <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="例：TWICE 10TH ANNIVERSARY 官方紀念毛毯斗篷"
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                    className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-rose-500 font-medium"
-                  />
-                </div>
+                <label className="text-xs font-bold text-slate-700 block">本團務成團目標（件）
+                  <input type="number" min={1} value={targetUnits} onChange={event => setTargetUnits(Number(event.target.value))} className="mt-1 w-full px-3 py-2 text-xs sm:text-sm font-mono rounded-xl border border-slate-300 bg-white focus:outline-rose-500" />
+                </label>
               </div>
 
-              {!editingProduct && (
-                <section className="p-4 rounded-2xl border border-rose-200 bg-rose-50/40 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900">同一團務的其他商品</h4>
-                      <p className="text-[11px] text-slate-500 mt-1">本表單的商品名稱和售價欄位是商品 1；其他商品會共用團體、主題、圖片和介紹。</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleAddAdditionalProduct}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> 新增商品
-                    </button>
+              {/* Each row is a sellable item under the same campaign. */}
+              <section className="p-4 rounded-2xl border border-rose-200 bg-rose-50/40 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">本主題批號的商品品項</h4>
+                    <p className="text-[11px] text-slate-500 mt-1">每列都是同一主題批號中的一個商品，可分別設定幣別售價與可選團員。</p>
                   </div>
-
-                  {additionalProducts.length > 0 && (
-                    <div className="space-y-3">
-                      {additionalProducts.map((item, index) => (
-                        <div key={item.id} className="p-3 bg-white rounded-xl border border-slate-200 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-700">商品 {index + 2}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveAdditionalProduct(item.id)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                              aria-label={`刪除商品 ${index + 2}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_10rem] gap-3">
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">商品名稱</label>
-                              <input
-                                type="text"
-                                value={item.title}
-                                onChange={e => handleUpdateAdditionalProduct(item.id, { title: e.target.value })}
-                                placeholder="例：專輯 A Ver."
-                                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-rose-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">台幣售價</label>
-                              <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-600">NT$</span>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={item.price || ''}
-                                  onChange={e => handleUpdateAdditionalProduct(item.id, { price: Number(e.target.value) })}
-                                  placeholder="1280"
-                                  className="w-full pl-11 pr-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:outline-rose-500"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          <label className="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={item.canChooseMember}
-                              onChange={e => handleUpdateAdditionalProduct(item.id, { canChooseMember: e.target.checked })}
-                              className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
-                            />
-                            此商品開放選擇團員
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              )}
-
-              {/* CURRENCY & PRICING SECTION (KRW / JPY / TWD) */}
-              <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Globe2 className="w-4 h-4 text-rose-500" />
-                    <span>多幣別售價設定 (韓幣 KRW ₩ / 日幣 JPY ¥ / 台幣 NT$)</span>
-                  </span>
-                  {draftSavedTip && (
-                    <span className="text-[11px] text-rose-600 font-bold">已自動依匯率更新台幣售價！</span>
-                  )}
+                  {!editingProduct && <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增品項</button>}
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs text-slate-600 font-medium">
-                        韓幣官方原價 (KRW ₩)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleConvertFromKrw}
-                        className="text-[11px] text-rose-600 hover:text-rose-700 flex items-center gap-1 font-semibold"
-                        title="依韓幣匯率試算台幣"
-                      >
-                        <Calculator className="w-3 h-3" />
-                        <span>折算台幣</span>
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">₩</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={500}
-                        placeholder="55000"
-                        value={krwPrice || ''}
-                        onChange={e => setKrwPrice(Number(e.target.value))}
-                        className="w-full pl-8 pr-3 py-2 text-xs sm:text-sm font-mono rounded-xl border border-slate-300 bg-white focus:outline-rose-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs text-slate-600 font-medium">
-                        日圓官方原價 (JPY ¥)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleConvertFromJpy}
-                        className="text-[11px] text-rose-600 hover:text-rose-700 flex items-center gap-1 font-semibold"
-                        title="依日幣匯率試算台幣"
-                      >
-                        <Calculator className="w-3 h-3" />
-                        <span>折算台幣</span>
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">¥</span>
-                      <input
-                        type="number"
-                        min={0}
-                        step={100}
-                        placeholder="6200"
-                        value={jpyPrice || ''}
-                        onChange={e => setJpyPrice(Number(e.target.value))}
-                        className="w-full pl-8 pr-3 py-2 text-xs sm:text-sm font-mono rounded-xl border border-slate-300 bg-white focus:outline-rose-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200">
-                  <div>
-                    <label className="text-xs font-bold text-slate-800 block mb-1">
-                      台幣跟團售價 (NT$) <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-600">NT$</span>
-                      <input
-                        type="number"
-                        required
-                        min={1}
-                        value={price}
-                        onChange={e => setPrice(Number(e.target.value))}
-                        className="w-full pl-11 pr-3 py-2 text-xs sm:text-sm font-mono font-bold rounded-xl border border-rose-300 bg-white focus:outline-rose-500 text-rose-950"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      成團目標 (件)
-                    </label>
-                    <input
-                      type="number"
-                      min={10}
-                      value={targetUnits}
-                      onChange={e => setTargetUnits(Number(e.target.value))}
-                      className="w-full px-3 py-2 text-xs sm:text-sm font-mono rounded-xl border border-slate-300 bg-white focus:outline-rose-500"
-                    />
-                  </div>
-                </div>
-              </div>
+                {[
+                  { id: 'primary', title, price, krwPrice, jpyPrice, canChooseMember, memberOptionsText, primary: true },
+                  ...additionalProducts.map(item => ({ ...item, primary: false })),
+                ].map((item, index) => {
+                  const updateItem = (updates: Partial<AdditionalProductDraft>) => {
+                    if (item.primary) {
+                      if (updates.title !== undefined) setTitle(updates.title);
+                      if (updates.price !== undefined) setPrice(updates.price);
+                      if (updates.krwPrice !== undefined) setKrwPrice(updates.krwPrice);
+                      if (updates.jpyPrice !== undefined) setJpyPrice(updates.jpyPrice);
+                      if (updates.canChooseMember !== undefined) setCanChooseMember(updates.canChooseMember);
+                      if (updates.memberOptionsText !== undefined) setMemberOptionsText(updates.memberOptionsText);
+                    } else {
+                      handleUpdateAdditionalProduct(item.id, updates);
+                    }
+                  };
+                  return (
+                    <article key={item.id} className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
+                      <div className="flex items-center justify-between"><h5 className="text-xs font-bold text-slate-800">商品 {index + 1}</h5>{!item.primary && <button type="button" onClick={() => handleRemoveAdditionalProduct(item.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" aria-label={`刪除商品 ${index + 1}`}><Trash2 className="w-4 h-4" /></button>}</div>
+                      <label className="block text-[11px] font-semibold text-slate-600">商品名稱 <span className="text-rose-500">*</span><input required type="text" value={item.title} onChange={event => updateItem({ title: event.target.value })} placeholder="例如：專輯 A Ver.、應援毛巾" className="mt-1 w-full px-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-rose-500" /></label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label className="block text-[11px] font-semibold text-slate-600">台幣售價（結帳使用）<span className="text-rose-500">*</span><div className="relative mt-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-600">NT$</span><input required type="number" min={1} value={item.price || ''} onChange={event => updateItem({ price: Number(event.target.value) })} placeholder="1,280" className="w-full pl-11 pr-3 py-2.5 text-sm font-mono rounded-xl border border-rose-300 focus:outline-rose-500" /></div></label>
+                        <label className="block text-[11px] font-semibold text-slate-600">韓幣售價（選填）<div className="relative mt-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">₩</span><input type="number" min={0} value={item.krwPrice || ''} onChange={event => updateItem({ krwPrice: Number(event.target.value) })} placeholder="選填" className="w-full pl-8 pr-3 py-2.5 text-sm font-mono rounded-xl border border-slate-300 focus:outline-rose-500" /></div></label>
+                        <label className="block text-[11px] font-semibold text-slate-600">日圓售價（選填）<div className="relative mt-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">¥</span><input type="number" min={0} value={item.jpyPrice || ''} onChange={event => updateItem({ jpyPrice: Number(event.target.value) })} placeholder="選填" className="w-full pl-8 pr-3 py-2.5 text-sm font-mono rounded-xl border border-slate-300 focus:outline-rose-500" /></div></label>
+                      </div>
+                      <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer"><input type="checkbox" checked={item.canChooseMember} onChange={event => updateItem({ canChooseMember: event.target.checked })} className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4" />這個商品開放選擇團員</label>
+                      {item.canChooseMember && <label className="block text-[11px] font-semibold text-slate-600">此商品可選團員 <span className="text-rose-500">*</span><input required type="text" value={item.memberOptionsText} onChange={event => updateItem({ memberOptionsText: event.target.value })} placeholder="輸入團員名稱，以逗號分隔" className="mt-1 w-full px-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-rose-500" /><span className="block mt-1 text-[10px] text-slate-400">例如：娜璉、定延、Momo、Sana</span></label>}
+                    </article>
+                  );
+                })}
+              </section>
 
               {/* PAYMENT METHOD SELECTION (Requirement 2: 付款方式共3種) */}
               <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-3">
@@ -839,31 +691,6 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   onChange={e => setPobDetail(e.target.value)}
                   className="w-full px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-rose-500"
                 />
-              </div>
-
-              {/* Member Options */}
-              <div className="p-4 rounded-2xl border border-slate-200 space-y-3">
-                <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={canChooseMember}
-                    onChange={e => setCanChooseMember(e.target.checked)}
-                    className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4"
-                  />
-                  商品 1 開放選擇團員
-                </label>
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">
-                    團員清單（勾選可選團員的商品會共用；以逗號區隔）
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="例：娜璉, 定延, Momo, Sana, 志效, Mina, 多賢, 彩瑛, 子瑜"
-                    value={memberOptionsText}
-                    onChange={e => setMemberOptionsText(e.target.value)}
-                    className="w-full px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-rose-500"
-                  />
-                </div>
               </div>
 
               {/* MULTI-IMAGE UPLOAD & GALLERY SECTION */}

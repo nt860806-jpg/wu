@@ -400,12 +400,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                         <span className="text-base font-extrabold text-slate-900 font-mono">
                           NT$ {product.price.toLocaleString()}
                         </span>
-                        {product.krwPrice && (
-                          <span className="text-[11px] text-slate-400 font-mono">
-                            ₩{product.krwPrice.toLocaleString()}
-                          </span>
-                        )}
                       </div>
+                      {(product.krwPrice || product.jpyPrice) && <div className="flex flex-wrap gap-2 text-[10px] text-slate-400 font-mono">{product.krwPrice ? <span>₩{product.krwPrice.toLocaleString()}</span> : null}{product.jpyPrice ? <span>¥{product.jpyPrice.toLocaleString()}</span> : null}</div>}
 
                       <div className="grid grid-cols-2 gap-2">
                         <button
@@ -480,6 +476,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   <div className="text-xl font-extrabold text-rose-600 font-mono">
                     NT$ {selectedProduct.price.toLocaleString()}
                   </div>
+                  {(selectedProduct.krwPrice || selectedProduct.jpyPrice) && <div className="flex gap-3 text-xs text-slate-500 font-mono">{selectedProduct.krwPrice ? <span>韓幣 ₩{selectedProduct.krwPrice.toLocaleString()}</span> : null}{selectedProduct.jpyPrice ? <span>日圓 ¥{selectedProduct.jpyPrice.toLocaleString()}</span> : null}</div>}
 
                   <div className="p-3 rounded-xl bg-rose-50/70 border border-rose-100 text-xs text-rose-950 space-y-1">
                     <div className="font-bold flex items-center gap-1.5">
