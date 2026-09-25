@@ -50,6 +50,7 @@ interface AdminPageProps {
   onMarkRefundCompleted: (orderId: string) => void;
   onBatchUpdateOrders?: (orderIds: string[], updates: Partial<Order>) => void;
   onAdvanceBatchStatus: (batchId: string) => void;
+  onMarkBatchShippingComplete: (batchId: string, complete: boolean) => void;
   onUpdateBatchStatus?: (batchId: string, newStatus: OrderStatus) => void;
   onOpenShare: () => void;
   onEditProduct: (product: Product) => void;
@@ -91,6 +92,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onMarkRefundCompleted,
   onBatchUpdateOrders,
   onAdvanceBatchStatus,
+  onMarkBatchShippingComplete,
   onUpdateBatchStatus,
   onOpenShare,
   onEditProduct,
@@ -107,6 +109,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Main view tab
   const [activeTab, setActiveTab] = useState<'orders' | 'batches' | 'admins' | 'products' | 'artists' | 'cancellations'>('orders');
   const [productView, setProductView] = useState<'available' | 'offline'>('available');
+  const [showCompletedBatches, setShowCompletedBatches] = useState(false);
 
   // Filters for orders - 嚴格遵守兩層架構 (Requirement 5)
   // 第一層（根目錄/團體）：Artist
@@ -761,7 +764,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               }`}
             >
               <Truck className="w-4 h-4" />
-              <span>批次物流狀態推進控制器 ({batches.length})</span>
+              <span>批次物流狀態推進控制器 ({batches.filter(batch => !batch.isShippingComplete).length})</span>
             </button>
 
             <button
@@ -1502,8 +1505,38 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               </button>
             </div>
 
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div>
+                <p className="text-sm font-bold text-slate-800">進行中的批次</p>
+                <p className="text-xs text-slate-500 mt-0.5">全部包裹寄出後可移至歷史區，物流紀錄仍會保留。</p>
+              </div>
+              <button type="button" onClick={() => setShowCompletedBatches(value => !value)} className={`px-3 py-2 rounded-xl text-xs font-bold border ${showCompletedBatches ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}>
+                {showCompletedBatches ? '隱藏' : '查看'}已完成出貨（{batches.filter(batch => batch.isShippingComplete).length}）
+              </button>
+            </div>
+
+            {showCompletedBatches && batches.some(batch => batch.isShippingComplete) && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-bold text-slate-700">已完成出貨紀錄</h4>
+                <div className="space-y-2">
+                  {batches.filter(batch => batch.isShippingComplete).map(batch => (
+                    <div key={batch.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">{batch.title}</p>
+                        <p className="text-xs text-slate-600 mt-0.5">{batch.batchCode}・{batch.artist}・{batch.campaign || '未設定主題'}・{batch.lastUpdated}</p>
+                      </div>
+                      <button type="button" disabled={!isAdmin} onClick={() => onMarkBatchShippingComplete(batch.id, false)} className="shrink-0 px-3 py-2 rounded-xl border border-emerald-300 bg-white text-emerald-800 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50">移回進行中</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {batches.every(batch => batch.isShippingComplete) && (
+              <p className="py-8 text-center text-sm text-slate-500">目前沒有進行中的批次。</p>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-              {batches.map(batch => {
+              {batches.filter(batch => !batch.isShippingComplete).map(batch => {
                 const batchOrdersCount = orders.filter(o => o.batchCode === batch.batchCode).length;
                 const matchedStep = ORDER_STATUS_FLOW_STEPS.find(s => s.status === batch.statusCode) || ORDER_STATUS_FLOW_STEPS[0];
 
@@ -1572,6 +1605,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
                       <span>{isAdmin ? '推進至下一物流階段 (同步全團)' : '推進物流階段 (限管理員)'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!isAdmin || batch.statusCode !== 'domestic_shipping'}
+                      onClick={() => {
+                        if (window.confirm(`確認「${batch.batchCode}」的所有包裹都已寄出？確認後會收進已完成紀錄，不會刪除團務或訂單。`)) {
+                          onMarkBatchShippingComplete(batch.id, true);
+                        }
+                      }}
+                      className="w-full py-2 rounded-xl border border-emerald-200 bg-white text-emerald-800 text-xs font-bold hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {batch.statusCode === 'domestic_shipping' ? '確認全部出貨完成並收進歷史' : '推進至超商寄送階段後可結案'}
                     </button>
 
                     <div className="text-[11px] text-slate-500 bg-white p-2 rounded-xl border border-slate-200 flex items-center gap-1.5">

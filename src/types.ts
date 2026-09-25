@@ -155,6 +155,8 @@ export interface ShippingBatch {
   campaign?: string; // 對應之主題活動
   statusText: string;
   statusCode: OrderStatus;
+  /** Keep completed dispatches out of the active admin controller without deleting their history. */
+  isShippingComplete?: boolean;
   flightOrContainer?: string; // 不在前端顯示
   totalParcels: number;
   shippedParcels: number;

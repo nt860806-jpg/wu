@@ -467,6 +467,11 @@ export default function App() {
     handleUpdateBatchStatus(batchId, nextStatus);
   };
 
+  const handleMarkBatchShippingComplete = (batchId: string, complete: boolean) => {
+    if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return;
+    setBatches(prev => prev.map(batch => batch.id === batchId ? { ...batch, isShippingComplete: complete } : batch));
+  };
+
   // User Profile Role Switch
   const handleSwitchUserRole = async () => {
     if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return;
@@ -637,6 +642,7 @@ export default function App() {
             onMarkRefundCompleted={handleMarkRefundCompleted}
             onBatchUpdateOrders={handleBatchUpdateOrders}
             onAdvanceBatchStatus={handleAdvanceBatchStatus}
+            onMarkBatchShippingComplete={handleMarkBatchShippingComplete}
             onUpdateBatchStatus={handleUpdateBatchStatus}
             onOpenShare={() => setIsShareModalOpen(true)}
             onEditProduct={(product) => { setProductToEdit(product); handleNavigate('add-product'); }}
