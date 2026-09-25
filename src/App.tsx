@@ -83,7 +83,17 @@ export default function App() {
       }
       const role = ADMIN_EMAILS.includes(email.toLowerCase()) ? 'admin' : 'fan';
       const base = role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan;
-      setCurrentUser({ ...base, id: session.user.id, email, name: email.split('@')[0], role, isLoggedIn: true });
+      const metadata = session.user.user_metadata || {};
+      setCurrentUser({
+        ...base,
+        id: session.user.id,
+        email,
+        name: metadata.full_name || email.split('@')[0],
+        phone: metadata.phone || '',
+        socialNickname: metadata.social_nickname || '',
+        role,
+        isLoggedIn: true,
+      });
     });
     return () => {
       isMounted = false;

@@ -74,6 +74,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [registrationName, setRegistrationName] = useState('');
+  const [registrationPhone, setRegistrationPhone] = useState('');
+  const [registrationSocialNickname, setRegistrationSocialNickname] = useState('');
   const [loginToast, setLoginToast] = useState('');
   const [loginToastType, setLoginToastType] = useState<'info' | 'success' | 'error'>('info');
   const [isRegistering, setIsRegistering] = useState(false);
@@ -121,11 +124,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isRegistering && (!registrationName.trim() || !registrationPhone.trim() || !registrationSocialNickname.trim())) {
+      setLoginToastType('error');
+      setLoginToast('請填寫真實姓名、手機號碼和社群暱稱。');
+      return;
+    }
     setLoginToastType('info');
     setLoginToast(isRegistering ? '正在建立會員…' : '正在驗證帳號…');
     try {
       const { data, error } = isRegistering
-        ? await supabase.auth.signUp({ email: email.trim(), password })
+        ? await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+              data: {
+                full_name: registrationName.trim(),
+                phone: registrationPhone.trim(),
+                social_nickname: registrationSocialNickname.trim(),
+              },
+            },
+          })
         : await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) throw error;
       if (!data.user) throw new Error('無法建立帳號，請稍後再試');
@@ -137,12 +155,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         return;
       }
       const role = ['asd0578236@gmail.com', 'nt860806@gmail.com'].includes((data.user.email || '').toLowerCase()) ? 'admin' : 'fan';
+      const metadata = data.user.user_metadata || {};
       const profile: UserProfile = {
         ...(role === 'admin' ? MOCK_USERS.admin : MOCK_USERS.fan),
         id: data.user.id,
-        name: (data.user.email || '').split('@')[0],
+        name: metadata.full_name || (data.user.email || '').split('@')[0],
         email: data.user.email || email,
         role,
+        phone: metadata.phone || '',
+        socialNickname: metadata.social_nickname || '',
         isLoggedIn: true,
       };
       onSetUser(profile);
@@ -298,7 +319,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     {isPasswordRecovery ? '設定新密碼' : isRegistering ? '註冊會員' : '會員帳號登入'}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {isPasswordRecovery ? '請輸入並確認新的登入密碼。' : isRegistering ? '建立帳號後即可使用會員功能。' : '登入後可自動記錄歷史跟團訂單，無須每次輸入基本資料。'}
+                    {isPasswordRecovery ? '請輸入並確認新的登入密碼。' : isRegistering ? '請先填寫會員基本資料，之後下訂時會自動帶入。' : '登入後可自動記錄歷史跟團訂單，無須每次輸入基本資料。'}
                   </p>
                 </div>
                 <span className="text-xs text-rose-600 font-semibold bg-rose-50 px-2.5 py-1 rounded-full border border-rose-100">
@@ -324,6 +345,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </form>}
 
               {!isPasswordRecovery && <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+                {isRegistering && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="block text-xs font-bold text-slate-700">
+                      真實姓名 <span className="text-rose-500">*</span>
+                      <input
+                        type="text"
+                        required
+                        autoComplete="name"
+                        placeholder="請填寫與取件證件相符的姓名"
+                        value={registrationName}
+                        onChange={event => setRegistrationName(event.target.value)}
+                        className="mt-1 w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-rose-500"
+                      />
+                    </label>
+                    <label className="block text-xs font-bold text-slate-700">
+                      手機號碼 <span className="text-rose-500">*</span>
+                      <input
+                        type="tel"
+                        required
+                        autoComplete="tel"
+                        placeholder="例：0912345678"
+                        value={registrationPhone}
+                        onChange={event => setRegistrationPhone(event.target.value)}
+                        className="mt-1 w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-rose-500"
+                      />
+                    </label>
+                    <label className="block text-xs font-bold text-slate-700 sm:col-span-2">
+                      社群暱稱（Threads／IG／LINE） <span className="text-rose-500">*</span>
+                      <input
+                        type="text"
+                        required
+                        autoComplete="nickname"
+                        placeholder="例：@once_mina97 或佩儀"
+                        value={registrationSocialNickname}
+                        onChange={event => setRegistrationSocialNickname(event.target.value)}
+                        className="mt-1 w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-rose-500"
+                      />
+                    </label>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
