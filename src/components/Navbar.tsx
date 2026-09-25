@@ -69,12 +69,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 group-hover:text-rose-600 transition-colors">
                   追星便利店
                 </span>
-                <span className="text-[10px] font-semibold bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full border border-rose-200/60 hidden sm:inline-block">
-                  官方藝人集單所
-                </span>
               </div>
               <p className="text-[11px] text-slate-500 hidden md:block tracking-wide">
-                TWICE & K-POP 藝人官方周邊專屬代購
+                TWICE & JYP藝人官方周邊代購
               </p>
             </div>
           </div>
