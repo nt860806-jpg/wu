@@ -53,7 +53,7 @@ interface AdminPageProps {
   onMarkBatchShippingComplete: (batchId: string, complete: boolean) => void;
   onUpdateBatchStatus?: (batchId: string, newStatus: OrderStatus) => void;
   onOpenShare: () => void;
-  onEditProduct: (product: Product) => void;
+  onEditProductGroup: (products: Product[]) => void;
   onArchiveProducts: (productIds: string[]) => void;
   onReopenProducts: (productIds: string[]) => void;
   onDeleteOfflineProduct: (productId: string) => void;
@@ -95,7 +95,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onMarkBatchShippingComplete,
   onUpdateBatchStatus,
   onOpenShare,
-  onEditProduct,
+  onEditProductGroup,
   onArchiveProducts,
   onReopenProducts,
   onDeleteOfflineProduct,
@@ -931,7 +931,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                             <h4 className="font-semibold text-xs text-slate-900">{product.title}</h4>
                             <p className="text-[11px] text-slate-500 mt-1">NT$ {product.price.toLocaleString()}・下架日期：{product.unpublishAt || '未設定'}</p>
                             <div className="flex flex-wrap gap-2 mt-2">
-                              <button type="button" onClick={() => onEditProduct(product)} className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold hover:bg-slate-50 inline-flex items-center gap-1"><Edit className="w-3 h-3" />編輯</button>
                               {productView === 'offline' && (
                                 <>
                                   <button type="button" onClick={() => { if (window.confirm(`確定永久刪除「${product.title}」？此操作無法復原。`)) onDeleteOfflineProduct(product.id); }} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />永久刪除</button>
@@ -943,6 +942,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       </div>
                     </details>
                     <div className="flex justify-end border-t border-slate-100 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => onEditProductGroup(group.products)}
+                        disabled={!isAdmin}
+                        className="mr-auto px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50 inline-flex items-center gap-1"
+                      ><Edit className="w-3.5 h-3.5" />編輯整團</button>
                       {productView === 'available' ? (
                         <button
                           type="button"

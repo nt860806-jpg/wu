@@ -26,6 +26,7 @@ import { isProductAvailable, supabase } from '../lib/supabase';
 interface AddProductPageProps {
   onAddProduct: (product: Product) => Promise<boolean>;
   editingProduct?: Product | null;
+  editingProducts?: Product[];
   onUpdateProduct?: (product: Product) => Promise<boolean>;
   onNavigate: (page: ActivePage) => void;
   onOpenShare: () => void;
@@ -48,6 +49,7 @@ interface AdditionalProductDraft {
 export const AddProductPage: React.FC<AddProductPageProps> = ({
   onAddProduct,
   editingProduct,
+  editingProducts,
   onUpdateProduct,
   onNavigate,
   onOpenShare,
@@ -56,6 +58,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
 }) => {
   const { activeGroups } = useArtistGroups();
   const isAdmin = currentUser?.role === 'admin';
+  const isEditingGroup = Boolean(editingProducts?.length);
   const [openCampaigns, setOpenCampaigns] = useState<string[]>([]);
   const [isLoadingOpenCampaigns, setIsLoadingOpenCampaigns] = useState(true);
   // Load draft from localStorage if available
@@ -344,11 +347,11 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       { id: 'primary', title, price, krwPrice, jpyPrice, canChooseMember, memberOptionsText },
       ...additionalProducts,
     ];
-    if (productDrafts.some(item => !item.title.trim() || item.price <= 0)) {
+    if (!isEditingGroup && productDrafts.some(item => !item.title.trim() || item.price <= 0)) {
       setSubmitError('請填寫每個品項的商品名稱和台幣售價。');
       return;
     }
-    if (productDrafts.some(item => item.canChooseMember && !item.memberOptionsText.split(/[,，\n]/).some(member => member.trim()))) {
+    if (!isEditingGroup && productDrafts.some(item => item.canChooseMember && !item.memberOptionsText.split(/[,，\n]/).some(member => member.trim()))) {
       setSubmitError('已勾選可選團員的商品，請填入該商品可選的團員名單。');
       return;
     }
@@ -375,6 +378,36 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       isOfficialLicense: true,
       paymentMethod,
     };
+
+    if (isEditingGroup && editingProducts && onUpdateProduct) {
+      const groupUpdates = editingProducts.map(product => ({
+        ...product,
+        ...commonProductFields,
+        id: product.id,
+        title: product.title,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        krwPrice: product.krwPrice,
+        jpyPrice: product.jpyPrice,
+        currentUnits: product.currentUnits,
+        targetUnits: Number(targetUnits) || 50,
+        memberOptions: product.memberOptions,
+        status: product.status,
+        archived: product.archived,
+      }));
+
+      for (const [index, product] of groupUpdates.entries()) {
+        const saved = await onUpdateProduct(product);
+        if (!saved) {
+          setSubmitError(`整團更新至第 ${index + 1} 項時失敗；請至後台確認已更新的商品後再重試。`);
+          return;
+        }
+      }
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      setSubmittedSuccess(true);
+      setTimeout(() => onNavigate('admin'), 1500);
+      return;
+    }
 
     const now = Date.now();
     const listingGroupId = editingProduct?.listingGroupId || `group-${now}`;
@@ -476,11 +509,11 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     <div className="space-y-10">
       {/* 每一頁都要有頁面標題與描述 */}
       <PageHeader
-        title={editingProduct ? '編輯官方周邊介紹' : '開立全新官方周邊團務'}
+        title={editingProduct ? '編輯整團周邊介紹' : '開立全新官方周邊團務'}
         description={editingProduct
-          ? '可更新這團商品，也能新增其他品項；新增的商品會與目前商品顯示在同一團務。'
+          ? '一次更新整團共用介紹、圖片與團務設定；各商品名稱、售價和團員選項會保留。'
           : '同一團務可一次上架多款不同售價商品，個別設定是否開放選擇團員，並共用活動介紹與圖片。'}
-        tag={editingProduct ? '管理員 · 編輯周邊' : '管理員 · 新增周邊'}
+        tag={editingProduct ? '管理員 · 編輯整團' : '管理員 · 新增周邊'}
         actionText="← 返回後台面板"
         onActionClick={() => onNavigate('admin')}
         onOpenShareModal={onOpenShare}
@@ -494,7 +527,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Plus className="w-5 h-5 text-rose-600" />
-                <span>{editingProduct ? '編輯周邊基本資料' : '團務周邊基本資料填寫'}</span>
+                <span>{editingProduct ? '編輯整團基本資料' : '團務周邊基本資料填寫'}</span>
               </h3>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 font-medium">
@@ -515,7 +548,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
             {submittedSuccess && (
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
                 <Check className="w-4 h-4" />
-                <span>{editingProduct ? (additionalProducts.length ? `團務商品已更新，並新增 ${additionalProducts.length} 款同團商品！` : '商品介紹已更新！') : '團務與團內商品已成功發布！'} 正在返回管理頁面...</span>
+                <span>{editingProduct ? (isEditingGroup ? `整團 ${editingProducts?.length || 0} 項商品已更新！` : additionalProducts.length ? `團務商品已更新，並新增 ${additionalProducts.length} 款同團商品！` : '商品介紹已更新！') : '團務與團內商品已成功發布！'} 正在返回管理頁面...</span>
               </div>
             )}
 
@@ -619,12 +652,24 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
               <section className="p-4 rounded-2xl border border-rose-200 bg-rose-50/40 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900">本主題的商品品項</h4>
-                    <p className="text-[11px] text-slate-500 mt-1">每列都是同一主題中的一個商品，可分別設定幣別售價與可選團員。</p>
+                    <h4 className="text-sm font-bold text-slate-900">{isEditingGroup ? '本團商品' : '本主題的商品品項'}</h4>
+                    <p className="text-[11px] text-slate-500 mt-1">{isEditingGroup ? '這些商品會保留各自的名稱、售價與團員選項；上方資料會一次套用整團。' : '每列都是同一主題中的一個商品，可分別設定幣別售價與可選團員。'}</p>
                   </div>
-                  <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增同團商品</button>
+                  {!isEditingGroup && <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增同團商品</button>}
                 </div>
-                {[
+                {isEditingGroup ? (
+                  <div className="space-y-2">
+                    {editingProducts?.map((product, index) => (
+                      <article key={product.id} className="flex flex-wrap items-center justify-between gap-2 p-3 bg-white rounded-xl border border-slate-200">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-800">商品 {index + 1} · {product.title}</p>
+                          <p className="text-[11px] text-slate-500 mt-1">NT$ {product.price.toLocaleString()}　{product.krwPrice ? `₩ ${product.krwPrice.toLocaleString()}` : ''}　{product.jpyPrice ? `¥ ${product.jpyPrice.toLocaleString()}` : ''}</p>
+                        </div>
+                        <span className="text-[10px] text-slate-500">{product.memberOptions?.length ? `可選團員：${product.memberOptions.join('、')}` : '不選團員'}</span>
+                      </article>
+                    ))}
+                  </div>
+                ) : [
                   { id: 'primary', title, price, krwPrice, jpyPrice, canChooseMember, memberOptionsText, primary: true },
                   ...additionalProducts.map(item => ({ ...item, primary: false })),
                 ].map((item, index) => {

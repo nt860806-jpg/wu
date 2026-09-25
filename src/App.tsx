@@ -93,7 +93,7 @@ export default function App() {
 
   // Modals & Search Queries
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
-  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [productsToEdit, setProductsToEdit] = useState<Product[] | null>(null);
   const [orderSearchQuery, setOrderSearchQuery] = useState<string>('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -694,7 +694,7 @@ export default function App() {
             onMarkBatchShippingComplete={handleMarkBatchShippingComplete}
             onUpdateBatchStatus={handleUpdateBatchStatus}
             onOpenShare={() => setIsShareModalOpen(true)}
-            onEditProduct={(product) => { setProductToEdit(product); handleNavigate('add-product'); }}
+            onEditProductGroup={(groupProducts) => { setProductsToEdit(groupProducts); handleNavigate('add-product'); }}
             onArchiveProducts={handleArchiveProducts}
             onReopenProducts={handleReopenProducts}
             onDeleteOfflineProduct={handleDeleteOfflineProduct}
@@ -706,9 +706,10 @@ export default function App() {
         {currentPage === 'add-product' && (
           <AddProductPage
             onAddProduct={handleAddProduct}
-            editingProduct={productToEdit}
+            editingProduct={productsToEdit?.[0] || null}
+            editingProducts={productsToEdit || undefined}
             onUpdateProduct={handleUpdateProduct}
-            onNavigate={handleNavigate}
+            onNavigate={(page) => { if (page !== 'add-product') setProductsToEdit(null); handleNavigate(page); }}
             onOpenShare={() => setIsShareModalOpen(true)}
             currentUser={currentUser}
             onSwitchUserRole={handleSwitchUserRole}
