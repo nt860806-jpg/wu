@@ -20,7 +20,7 @@ import {
 import { Product, Artist, ProductCategory, ActivePage, UserProfile } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { useArtistGroups } from '../hooks/useArtistGroups';
-import { supabase } from '../lib/supabase';
+import { isProductAvailable, supabase } from '../lib/supabase';
 
 interface AddProductPageProps {
   onAddProduct: (product: Product) => Promise<boolean>;
@@ -55,6 +55,8 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
 }) => {
   const { activeGroups } = useArtistGroups();
   const isAdmin = currentUser?.role === 'admin';
+  const [openCampaigns, setOpenCampaigns] = useState<string[]>([]);
+  const [isLoadingOpenCampaigns, setIsLoadingOpenCampaigns] = useState(true);
   // Load draft from localStorage if available
   const savedDraft = (() => {
     try {
@@ -126,6 +128,36 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [draftSavedTip, setDraftSavedTip] = useState(false);
+
+  useEffect(() => {
+    let isActive = true;
+    const loadOpenCampaigns = async () => {
+      setIsLoadingOpenCampaigns(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('data,unpublish_at,archived');
+      if (!isActive) return;
+      if (error || !data) {
+        setOpenCampaigns([]);
+        setIsLoadingOpenCampaigns(false);
+        return;
+      }
+
+      const campaigns = Array.from(new Set(data
+        .map(row => ({
+          ...row.data,
+          unpublishAt: row.unpublish_at,
+          archived: row.archived,
+        }))
+        .filter(product => product.artist === artist && product.campaign && isProductAvailable(product))
+        .map(product => String(product.campaign))));
+      setOpenCampaigns(campaigns.sort((a, b) => a.localeCompare(b, 'zh-Hant')));
+      setIsLoadingOpenCampaigns(false);
+    };
+
+    void loadOpenCampaigns();
+    return () => { isActive = false; };
+  }, [artist]);
 
   // Quick preset images
   const presetImages = [
@@ -525,7 +557,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
 
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <span className="text-[10px] text-slate-500 self-center">快速代入活動批號：</span>
-                  {['10th_Anniversary', 'WorldTour_MD', 'FanMeeting_3rd', 'Comeback_Album_POB', 'PopUpStore_2026'].map(tag => (
+                  {openCampaigns.map(tag => (
                     <button
                       key={tag}
                       type="button"
@@ -539,6 +571,10 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                       {tag}
                     </button>
                   ))}
+                  {!isLoadingOpenCampaigns && openCampaigns.length === 0 && (
+                    <span className="text-[10px] text-slate-400 self-center">目前沒有開放中的活動批號</span>
+                  )}
+                  {isLoadingOpenCampaigns && <span className="text-[10px] text-slate-400 self-center">載入開放中的活動批號…</span>}
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
                   📌 提示：不同主題販售同名商品（如「隨機小卡」）時，系統會依主題批號分開統計庫存與價格。
