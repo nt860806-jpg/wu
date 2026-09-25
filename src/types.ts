@@ -118,7 +118,6 @@ export interface Order {
   paymentChoice?: 'transfer' | 'cash_on_delivery';
   paymentStatus: 'unpaid' | 'verifying' | 'paid';
   bankLastFive?: string;
-  transferorName?: string;
   shippingMethod: '7-11' | 'familymart' | 'home_delivery';
   storeName?: string;
   storeCode?: string;

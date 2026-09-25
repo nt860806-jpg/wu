@@ -47,7 +47,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   
   const [paymentChoice, setPaymentChoice] = useState<'transfer' | 'cash_on_delivery'>('transfer');
   const [bankLastFive, setBankLastFive] = useState('');
-  const [transferorName, setTransferorName] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [agreedTerms, setAgreedTerms] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -121,8 +120,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       setErrorMessage('請填寫正確的手機號碼 (接收出貨與二補通知)');
       return;
     }
-    if (paymentChoice === 'transfer' && !transferorName.trim()) {
-      setErrorMessage('請填寫轉帳人姓名');
+    if (paymentChoice === 'transfer' && !/^[0-9]{4,5}$/.test(bankLastFive.trim())) {
+      setErrorMessage('請填寫正確的帳號後五碼');
       return;
     }
     if (pobChoice === '自訂' && !customPobNotes.trim()) {
@@ -177,7 +176,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         paymentChoice,
         paymentStatus: paymentChoice === 'transfer' && bankLastFive ? 'verifying' : 'unpaid',
         bankLastFive: paymentChoice === 'transfer' ? bankLastFive.trim() || undefined : undefined,
-        transferorName: paymentChoice === 'transfer' ? transferorName.trim() : undefined,
         shippingMethod: '7-11',
         orderStatus: paymentChoice === 'transfer' && bankLastFive ? 'payment_verifying' : 'order_created',
         batchCode: `2409-${group.artist.replace(/[^a-z0-9]/gi, '').toUpperCase()}-A`,
@@ -537,12 +535,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 {paymentChoice === 'transfer' ? (
                   <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
                     <label className="block text-slate-700 font-medium">
-                      轉帳人姓名 <span className="text-rose-600">*</span>
-                      <input type="text" required maxLength={40} placeholder="請填寫實際轉帳人姓名" value={transferorName} onChange={e => setTransferorName(e.target.value)} className="mt-1 w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white" />
-                    </label>
-                    <label className="block mt-3 text-slate-700 font-medium">
-                      帳號後五碼（選填）
-                      <input type="text" inputMode="numeric" pattern="[0-9]{4,5}" maxLength={5} placeholder="例：48291" value={bankLastFive} onChange={e => setBankLastFive(e.target.value.replace(/\D/g, '').slice(0, 5))} className="mt-1 w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white font-mono" />
+                      帳號後五碼 <span className="text-rose-600">*</span>
+                      <input type="text" required inputMode="numeric" pattern="[0-9]{4,5}" maxLength={5} placeholder="請輸入 4 至 5 位數字" value={bankLastFive} onChange={e => setBankLastFive(e.target.value.replace(/\D/g, '').slice(0, 5))} className="mt-1 w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white font-mono" />
                     </label>
                   </div>
                 ) : (
