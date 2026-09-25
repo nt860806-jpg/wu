@@ -12,6 +12,7 @@ import {
   Flame,
   ArrowRight,
   Trash2,
+  GripVertical,
   RotateCcw,
   CreditCard,
   ShieldAlert,
@@ -93,6 +94,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
   const [imageUploadError, setImageUploadError] = useState('');
   const imageFileInput = useRef<HTMLInputElement>(null);
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
+  const [draggedImageIndex, setDraggedImageIndex] = useState<number | null>(null);
 
   const [pobDetail, setPobDetail] = useState(
     editingProduct?.pobDetail || savedDraft?.pobDetail || '贈送官方限量限定自拍小卡乙張（9款隨機發放）'
@@ -296,6 +298,24 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     if (activePreviewIndex >= galleryImages.length - 1) {
       setActivePreviewIndex(0);
     }
+  };
+
+  const handleReorderGalleryImage = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setGalleryImages(previous => {
+      if (fromIndex < 0 || toIndex < 0 || fromIndex >= previous.length || toIndex >= previous.length) return previous;
+      const reordered = [...previous];
+      const [movedImage] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, movedImage);
+      return reordered;
+    });
+    setActivePreviewIndex(activeIndex => {
+      if (activeIndex === fromIndex) return toIndex;
+      if (fromIndex < activeIndex && activeIndex <= toIndex) return activeIndex - 1;
+      if (toIndex <= activeIndex && activeIndex < fromIndex) return activeIndex + 1;
+      return activeIndex;
+    });
+    setDraggedImageIndex(null);
   };
 
   const handleAddAdditionalProduct = () => {
@@ -728,7 +748,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     <ImageIcon className="w-4 h-4 text-rose-500" />
                     <span>商品多圖上傳與圖庫 (已加入 {galleryImages.length} 張圖片)</span>
                   </label>
-                  <span className="text-[11px] text-slate-500">支援首圖與細節圖切換</span>
+                  <span className="text-[11px] text-slate-500">拖曳縮圖排序；第一張為主圖</span>
                 </div>
 
                 {/* Upload image files directly from this device */}
@@ -756,16 +776,34 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 {/* Thumbnails grid */}
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-2">
                   {galleryImages.map((img, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`relative group aspect-square rounded-xl overflow-hidden border-2 cursor-pointer transition-all ${
+                    <div
+                      key={idx}
+                      draggable={galleryImages.length > 1}
+                      onDragStart={event => {
+                        setDraggedImageIndex(idx);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', String(idx));
+                      }}
+                      onDragOver={event => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={event => {
+                        event.preventDefault();
+                        const fromIndex = draggedImageIndex ?? Number(event.dataTransfer.getData('text/plain'));
+                        if (Number.isInteger(fromIndex)) handleReorderGalleryImage(fromIndex, idx);
+                      }}
+                      onDragEnd={() => setDraggedImageIndex(null)}
+                      title="拖曳調整圖片順序"
+                      className={`relative group aspect-square rounded-xl overflow-hidden border-2 cursor-grab active:cursor-grabbing transition-all ${
                         activePreviewIndex === idx ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-200'
-                      }`}
+                      } ${draggedImageIndex === idx ? 'opacity-40' : ''}`}
                       onClick={() => setActivePreviewIndex(idx)}
                     >
                       <img 
-                        src={img} 
+                        src={img}
                         alt={`thumb-${idx}`} 
+                        draggable={false}
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
                       />
@@ -774,6 +812,9 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                           主圖
                         </span>
                       )}
+                      <span className="absolute bottom-1 left-1 p-1 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity" aria-label="拖曳排序">
+                        <GripVertical className="w-3 h-3" />
+                      </span>
                       <button
                         type="button"
                         onClick={(e) => {
