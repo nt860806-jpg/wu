@@ -56,7 +56,7 @@ interface AdminPageProps {
   onEditProductGroup: (products: Product[]) => void;
   onArchiveProducts: (productIds: string[]) => void;
   onReopenProducts: (productIds: string[]) => void;
-  onDeleteOfflineProduct: (productId: string) => void;
+  onDeleteOfflineProducts: (productIds: string[]) => void;
   currentUser?: UserProfile;
   onSwitchUserRole?: () => void;
 }
@@ -98,7 +98,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onEditProductGroup,
   onArchiveProducts,
   onReopenProducts,
-  onDeleteOfflineProduct,
+  onDeleteOfflineProducts,
   currentUser,
   onSwitchUserRole,
 }) => {
@@ -930,13 +930,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                           <div key={product.id} className="rounded-xl bg-slate-50 p-3">
                             <h4 className="font-semibold text-xs text-slate-900">{product.title}</h4>
                             <p className="text-[11px] text-slate-500 mt-1">NT$ {product.price.toLocaleString()}・下架日期：{product.unpublishAt || '未設定'}</p>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {productView === 'offline' && (
-                                <>
-                                  <button type="button" onClick={() => { if (window.confirm(`確定永久刪除「${product.title}」？此操作無法復原。`)) onDeleteOfflineProduct(product.id); }} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />永久刪除</button>
-                                </>
-                              )}
-                            </div>
                           </div>
                         ))}
                       </div>
@@ -960,16 +953,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                           className="px-3 py-2 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"
                         ><Trash2 className="w-3.5 h-3.5" />整團移至下架</button>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (window.confirm(`確定將「${representative.campaign || representative.title}」整團 ${group.products.length} 項商品重新上架？`)) {
-                              onReopenProducts(group.products.map(product => product.id));
-                            }
-                          }}
-                          disabled={!isAdmin}
-                          className="px-3 py-2 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1"
-                        ><RefreshCw className="w-3.5 h-3.5" />整團重新上架</button>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`確定將「${representative.campaign || representative.title}」整團 ${group.products.length} 項商品重新上架？`)) {
+                                onReopenProducts(group.products.map(product => product.id));
+                              }
+                            }}
+                            disabled={!isAdmin}
+                            className="px-3 py-2 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1"
+                          ><RefreshCw className="w-3.5 h-3.5" />整團重新上架</button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`確定永久刪除「${representative.campaign || representative.title}」已下架的 ${group.products.length} 項商品？此操作無法復原。`)) {
+                                onDeleteOfflineProducts(group.products.map(product => product.id));
+                              }
+                            }}
+                            disabled={!isAdmin}
+                            className="px-3 py-2 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"
+                          ><Trash2 className="w-3.5 h-3.5" />整團刪除</button>
+                        </div>
                       )}
                     </div>
                   </article>

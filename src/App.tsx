@@ -558,13 +558,14 @@ export default function App() {
     setProducts(prev => prev.map(product => reopenedById.get(product.id) || product));
   };
 
-  const handleDeleteOfflineProduct = async (productId: string) => {
-    if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return;
-    const product = products.find(item => item.id === productId);
-    if (!product || isProductAvailable(product)) return;
-    const { error } = await supabase.from('products').delete().eq('id', productId);
+  const handleDeleteOfflineProducts = async (productIds: string[]) => {
+    if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase()) || productIds.length === 0) return;
+    const selectedIds = new Set(productIds);
+    const selectedProducts = products.filter(product => selectedIds.has(product.id));
+    if (selectedProducts.length !== productIds.length || selectedProducts.some(isProductAvailable)) return;
+    const { error } = await supabase.from('products').delete().in('id', productIds);
     if (error) { window.alert('刪除失敗，請稍後重試。'); return; }
-    setProducts(prev => prev.filter(item => item.id !== productId));
+    setProducts(prev => prev.filter(product => !selectedIds.has(product.id)));
   };
 
   // Dynamic share metadata based on current page
@@ -697,7 +698,7 @@ export default function App() {
             onEditProductGroup={(groupProducts) => { setProductsToEdit(groupProducts); handleNavigate('add-product'); }}
             onArchiveProducts={handleArchiveProducts}
             onReopenProducts={handleReopenProducts}
-            onDeleteOfflineProduct={handleDeleteOfflineProduct}
+            onDeleteOfflineProducts={handleDeleteOfflineProducts}
             currentUser={currentUser}
             onSwitchUserRole={handleSwitchUserRole}
           />
