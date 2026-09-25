@@ -239,6 +239,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     ])
   ) as string[];
 
+  const currentTopicKeys = new Set(
+    products.filter(isProductAvailable).filter(product => product.campaign)
+      .map(product => `${product.artist.toLowerCase()}::${product.campaign.toLowerCase()}`)
+  );
+  const currentTopicBatches = batches.filter(batch => currentTopicKeys.has(`${batch.artist.toLowerCase()}::${(batch.campaign || '').toLowerCase()}`));
+  const activeControllerBatches = currentTopicBatches.filter(batch => !batch.isShippingComplete);
+  const completedCurrentTopicBatches = currentTopicBatches.filter(batch => batch.isShippingComplete);
+
   const availableCampaigns = selectedArtist === 'all'
     ? allCampaignsList
     : Array.from(
@@ -764,7 +772,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               }`}
             >
               <Truck className="w-4 h-4" />
-              <span>批次物流狀態推進控制器 ({batches.filter(batch => !batch.isShippingComplete).length})</span>
+              <span>批次物流狀態推進控制器 ({activeControllerBatches.length})</span>
             </button>
 
             <button
@@ -1508,18 +1516,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
               <div>
                 <p className="text-sm font-bold text-slate-800">進行中的批次</p>
-                <p className="text-xs text-slate-500 mt-0.5">全部包裹寄出後可移至歷史區，物流紀錄仍會保留。</p>
+                <p className="text-xs text-slate-500 mt-0.5">只列周邊介紹目前上架的主題；全部包裹寄出後可移至歷史區。</p>
               </div>
               <button type="button" onClick={() => setShowCompletedBatches(value => !value)} className={`px-3 py-2 rounded-xl text-xs font-bold border ${showCompletedBatches ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}>
-                {showCompletedBatches ? '隱藏' : '查看'}已完成出貨（{batches.filter(batch => batch.isShippingComplete).length}）
+                {showCompletedBatches ? '隱藏' : '查看'}已完成出貨（{completedCurrentTopicBatches.length}）
               </button>
             </div>
 
-            {showCompletedBatches && batches.some(batch => batch.isShippingComplete) && (
+            {showCompletedBatches && completedCurrentTopicBatches.length > 0 && (
               <div className="space-y-3">
                 <h4 className="text-sm font-bold text-slate-700">已完成出貨紀錄</h4>
                 <div className="space-y-2">
-                  {batches.filter(batch => batch.isShippingComplete).map(batch => (
+                  {completedCurrentTopicBatches.map(batch => (
                     <div key={batch.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-slate-800 truncate">{batch.title}</p>
@@ -1532,12 +1540,15 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               </div>
             )}
 
-            {batches.every(batch => batch.isShippingComplete) && (
-              <p className="py-8 text-center text-sm text-slate-500">目前沒有進行中的批次。</p>
+            {activeControllerBatches.length === 0 && (
+              <p className="py-8 text-center text-sm text-slate-500">目前沒有進行中的主題物流。</p>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-              {batches.filter(batch => !batch.isShippingComplete).map(batch => {
-                const batchOrdersCount = orders.filter(o => o.batchCode === batch.batchCode).length;
+              {activeControllerBatches.map(batch => {
+                const batchOrdersCount = orders.filter(order => order.orderStatus !== 'cancelled' && (
+                  order.items.some(item => item.campaign === batch.campaign && (batch.artist === 'ALL' || item.artist === batch.artist))
+                  || (order.campaign === batch.campaign && (batch.artist === 'ALL' || order.items.some(item => item.artist === batch.artist)))
+                )).length;
                 const matchedStep = ORDER_STATUS_FLOW_STEPS.find(s => s.status === batch.statusCode) || ORDER_STATUS_FLOW_STEPS[0];
 
                 return (

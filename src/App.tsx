@@ -114,6 +114,43 @@ export default function App() {
     return () => { void supabase.removeChannel(channel); };
   }, [currentUser.isLoggedIn, currentUser.email, currentUser.role]);
 
+  // Keep one logistics controller entry for every currently available artist/topic pair.
+  useEffect(() => {
+    const currentTopics = new Map<string, { artist: string; campaign: string }>();
+    products.filter(isProductAvailable).forEach(product => {
+      if (!product.campaign) return;
+      const key = `${product.artist.toLowerCase()}::${product.campaign.toLowerCase()}`;
+      currentTopics.set(key, { artist: product.artist, campaign: product.campaign });
+    });
+    if (!currentTopics.size) return;
+
+    setBatches(existing => {
+      const missingTopics = Array.from(currentTopics.entries()).filter(([key, topic]) =>
+        !existing.some(batch => `${batch.artist.toLowerCase()}::${(batch.campaign || '').toLowerCase()}` === key)
+      );
+      if (!missingTopics.length) return existing;
+      const now = new Date().toISOString().replace('T', ' ').slice(0, 16);
+      const newBatches: ShippingBatch[] = missingTopics.map(([key, topic]) => {
+        const slug = `${topic.artist}-${topic.campaign}`.normalize('NFKD').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toUpperCase();
+        return {
+          id: `topic-${encodeURIComponent(key)}`,
+          batchCode: `TOPIC-${slug}`,
+          title: `${topic.artist}・${topic.campaign} 主題物流`,
+          artist: topic.artist,
+          campaign: topic.campaign,
+          statusText: '目前開放跟團，等待團務物流更新',
+          statusCode: 'order_created',
+          totalParcels: 0,
+          shippedParcels: 0,
+          estimatedArrival: '待更新',
+          lastUpdated: now,
+          events: [],
+        };
+      });
+      return [...existing, ...newBatches];
+    });
+  }, [products]);
+
   useEffect(() => {
     localStorage.setItem('jyp_select_orders', JSON.stringify(orders));
   }, [orders]);
@@ -396,6 +433,12 @@ export default function App() {
     const targetBatch = batches.find(b => b.id === batchId);
     if (!targetBatch) return;
 
+    const belongsToBatch = (order: Order) => targetBatch.campaign
+      ? order.items.some(item => item.campaign === targetBatch.campaign && (targetBatch.artist === 'ALL' || item.artist === targetBatch.artist))
+        || (order.campaign === targetBatch.campaign && (targetBatch.artist === 'ALL' || order.items.some(item => item.artist === targetBatch.artist)))
+        || (!order.items.length && order.campaign === targetBatch.campaign)
+      : order.batchCode === targetBatch.batchCode;
+
     const statusText = getStatusTextFromCode(newStatus);
     const newEvent = {
       date: new Date().toISOString().replace('T', ' ').slice(0, 16),
@@ -422,7 +465,7 @@ export default function App() {
     // 2. Synchronize all orders belonging to this batch
     setOrders(prev =>
       prev.map(o => {
-        if (o.batchCode === targetBatch.batchCode && o.orderStatus !== 'cancelled') {
+        if (belongsToBatch(o) && o.orderStatus !== 'cancelled') {
           return {
             ...o,
             orderStatus: newStatus,
@@ -432,7 +475,7 @@ export default function App() {
         return o;
       })
     );
-    const batchOrders = orders.filter(order => order.batchCode === targetBatch.batchCode && order.orderStatus !== 'cancelled');
+    const batchOrders = orders.filter(order => belongsToBatch(order) && order.orderStatus !== 'cancelled');
     void Promise.all(batchOrders.map(order => supabase.from('orders').update({
       data: {
         ...order,
