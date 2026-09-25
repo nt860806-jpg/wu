@@ -114,7 +114,8 @@ export interface Order {
   isDepositOnly: boolean;
   depositAmountPaid: number;
   remainingAmount: number;
-  paymentMethod: 'pxpay' | 'atm' | 'linepay' | 'credit_card';
+  paymentMethod: 'pxpay' | 'atm' | 'linepay' | 'credit_card' | 'cash_on_delivery';
+  paymentChoice?: 'transfer' | 'cash_on_delivery';
   paymentStatus: 'unpaid' | 'verifying' | 'paid';
   bankLastFive?: string;
   shippingMethod: '7-11' | 'familymart' | 'home_delivery';

@@ -416,12 +416,6 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
                   <span>商品小計：</span>
                   <span className="font-mono">NT$ {searchedOrder.subtotal.toLocaleString()}</span>
                 </div>
-                {searchedOrder.paymentAccount && (
-                  <div className="flex justify-between">
-                    <span>指定匯款帳號：</span>
-                    <span className="font-mono text-slate-800 font-semibold">{searchedOrder.paymentAccount}</span>
-                  </div>
-                )}
                 <div className="flex justify-between font-bold text-slate-900 pt-1 border-t border-slate-200">
                   <span>訂單總額：</span>
                   <span className="font-mono text-rose-600">NT$ {searchedOrder.totalAmount.toLocaleString()}</span>

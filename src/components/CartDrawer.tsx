@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, ShieldCheck, Check, AlertCircle, Copy, Sparkles } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, ShieldCheck, Check, AlertCircle, Sparkles } from 'lucide-react';
 import { CartItem, Order, OrderItem, UserProfile } from '../types';
 import { BRAND_CONFIG } from '../data/mockData';
 import { generateOrderId, cleanPobDisplay } from '../utils/orderUtils';
@@ -45,13 +45,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [pobChoice, setPobChoice] = useState<'不挑成員' | '自訂'>('不挑成員');
   const [customPobNotes, setCustomPobNotes] = useState('');
   
-  // Payment: 只有全支付轉帳全支付(389)11016053741860 (Requirement 3)
+  const [paymentChoice, setPaymentChoice] = useState<'transfer' | 'cash_on_delivery'>('transfer');
   const [bankLastFive, setBankLastFive] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [agreedTerms, setAgreedTerms] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
-  const [copiedBank, setCopiedBank] = useState(false);
   const [useWalletCredit, setUseWalletCredit] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
@@ -92,14 +91,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       return;
     }
     setStep('checkout');
-  };
-
-  const handleCopyAccount = () => {
-    const match = currentPaymentAccount.match(/\d{8,}/);
-    const numToCopy = match ? match[0] : '11016053741860';
-    navigator.clipboard.writeText(numToCopy);
-    setCopiedBank(true);
-    setTimeout(() => setCopiedBank(false), 2000);
   };
 
   const handleCloseAndReset = () => {
@@ -175,17 +166,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       isDepositOnly: false, // 只有全額付清
       depositAmountPaid: finalTotal,
       remainingAmount: 0,
-      paymentMethod: 'pxpay', // 全支付 / 轉帳
-      paymentStatus: bankLastFive ? 'verifying' : 'unpaid',
-      bankLastFive: bankLastFive.trim() || undefined,
+      paymentMethod: paymentChoice === 'transfer' ? 'atm' : 'cash_on_delivery',
+      paymentChoice,
+      paymentStatus: paymentChoice === 'transfer' && bankLastFive ? 'verifying' : 'unpaid',
+      bankLastFive: paymentChoice === 'transfer' ? bankLastFive.trim() || undefined : undefined,
       shippingMethod: '7-11',
-      orderStatus: bankLastFive ? 'payment_verifying' : 'order_created',
+      orderStatus: paymentChoice === 'transfer' && bankLastFive ? 'payment_verifying' : 'order_created',
       batchCode: '2409-TWICE-A',
       campaign: cartItems[0]?.product.campaign || 'Official_Campaign',
       notes: orderNotes.trim(),
       pobPreference: finalPobPref,
       secondPaymentAmount: 0,
-      paymentAccount: activePaymentAccount,
+      paymentAccount: paymentChoice === 'transfer' ? activePaymentAccount : undefined,
       walletCreditApplied,
     };
 
@@ -221,7 +213,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </h3>
               <p className="text-xs text-slate-500">
                 {step === 'cart' && `共 ${cartItems.length} 項官方周邊商品（商品金額全額付清）`}
-                {step === 'checkout' && '已自動帶入會員資料，付款方式為全支付轉帳'}
+                {step === 'checkout' && '已自動帶入會員資料，請選擇轉帳或貨付'}
                 {step === 'success' && '請保存專屬訂單編號，可於會員中心追蹤'}
               </p>
             </div>
@@ -518,49 +510,30 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="space-y-3 pt-2">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                  3. 付款方式 (全額付清・轉帳後填寫後五碼)
+                  3. 付款方式
                 </h4>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50/80 to-rose-50/50 border border-amber-200 space-y-3 text-xs">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 bg-amber-500 text-white font-black rounded-lg text-xs tracking-wider">
-                        指定帳號
-                      </span>
-                      <span className="font-bold text-slate-900">
-                        {currentPaymentAccount}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyAccount}
-                      className="text-[11px] text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-300 hover:bg-slate-50 flex items-center gap-1 font-semibold shadow-2xs"
-                    >
-                      {copiedBank ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                      <span>{copiedBank ? '已複製帳號' : '複製帳號'}</span>
-                    </button>
-                  </div>
-
-                  <div className="bg-white p-3 rounded-xl border border-amber-200/80 font-mono text-xs space-y-1 text-slate-800">
-                    <div>轉帳通路/戶名：<strong>{currentPaymentAccount}</strong></div>
-                    <div>轉帳帳號：<strong className="text-base text-rose-600 font-bold tracking-wider">{currentPaymentAccount.match(/\d{8,}/)?.[0] || '11016053741860'}</strong></div>
-                    <div className="text-[11px] text-slate-500">※ 請核對無誤後再進行轉帳付款，避免款項延誤</div>
-                  </div>
-
-                  <div>
-                    <label className="text-slate-700 font-medium block mb-1">
-                      若您已完成轉帳，可直接填寫「帳號後五碼」或「轉帳人姓名」以加速對帳：
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={10}
-                      placeholder="例：48291 或佩儀 (稍後亦可在會員中心補填)"
-                      value={bankLastFive}
-                      onChange={e => setBankLastFive(e.target.value)}
-                      className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white font-mono"
-                    />
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button type="button" onClick={() => setPaymentChoice('transfer')} className={`p-4 rounded-2xl border text-left transition-colors ${paymentChoice === 'transfer' ? 'border-rose-400 bg-rose-50 ring-1 ring-rose-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                    <span className="block text-sm font-bold text-slate-900">轉帳</span>
+                    <span className="block mt-1 text-xs text-slate-500">匯款帳號會顯示在會員中心的訂單內</span>
+                  </button>
+                  <button type="button" onClick={() => setPaymentChoice('cash_on_delivery')} className={`p-4 rounded-2xl border text-left transition-colors ${paymentChoice === 'cash_on_delivery' ? 'border-rose-400 bg-rose-50 ring-1 ring-rose-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                    <span className="block text-sm font-bold text-slate-900">貨付</span>
+                    <span className="block mt-1 text-xs text-slate-500">請敲官賴確認可貨付再選</span>
+                  </button>
                 </div>
+                {paymentChoice === 'transfer' ? (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                    匯款帳號不會顯示在此頁；建立訂單後可於會員中心查看，後台完成對帳後會自動隱藏。
+                    <label className="block mt-3 text-slate-700 font-medium">
+                      已轉帳可填寫帳號後五碼或轉帳人姓名（選填）
+                      <input type="text" maxLength={10} placeholder="例：48291 或佩儀" value={bankLastFive} onChange={e => setBankLastFive(e.target.value)} className="mt-1 w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white font-mono" />
+                    </label>
+                  </div>
+                ) : (
+                  <p className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">貨付訂單不會顯示匯款帳號，也不需要填寫匯款後五碼。</p>
+                )}
               </div>
 
               {/* 4. Order Notes */}
@@ -663,7 +636,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
                 <div className="flex justify-between items-center text-slate-500 text-[11px]">
                   <span>付款方式：</span>
-                  <span>全支付轉帳全支付(389)11016053741860</span>
+                  <span>{createdOrder.paymentChoice === 'cash_on_delivery' ? '貨付' : '轉帳'}</span>
                 </div>
               </div>
 

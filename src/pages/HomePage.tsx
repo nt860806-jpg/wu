@@ -430,7 +430,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               { step: '01', title: '選定周邊與成員規格', desc: '選擇心儀藝人、款式與成員版本（可選排卡或全套特典），確認價格與截單日期。' },
-              { step: '02', title: '完成轉帳填寫後五碼', desc: '支援 ATM 轉帳、LINE Pay 或線上刷卡，填寫匯款後五碼 1-2 天內自動對帳核款。' },
+              { step: '02', title: '選擇轉帳或貨付', desc: '選擇轉帳可在會員中心訂單查看匯款資料；貨付請先聯繫官方 LINE 確認。轉帳填寫末五碼後，約 1-2 天完成對帳。' },
               { step: '03', title: '官方鎖單與國際空運', desc: '結單後由首爾官方原廠出貨，定期於官網批次物流進度更新。' },
               { step: '04', title: '抵台品檢開立賣貨便', desc: '海關清關完成後進行高標準品檢，開立 7-11 賣貨便二補專屬賣場寄出。' },
             ].map((st, i) => (
