@@ -1,4 +1,4 @@
-import { Order, OrderItem } from '../types';
+import { Order, OrderItem, ShippingBatch } from '../types';
 
 const PAYMENT_CONFIRMED_STATUSES = new Set<Order['orderStatus']>([
   'procuring', 'ordered', 'shipped_kr', 'warehouse', 'flight_transit',
@@ -20,8 +20,11 @@ export function getCampaignStatusKey(artist: string, campaign: string): string {
   return `${artist.trim().toLowerCase()}::${campaign.trim().toLowerCase()}`;
 }
 
-export function getOrderCampaignStatus(order: Order, artist: string, campaign: string): Order['orderStatus'] {
-  return order.campaignStatuses?.[getCampaignStatusKey(artist, campaign)] || order.orderStatus;
+export function getOrderCampaignStatus(order: Order, artist: string, campaign: string, batches: ShippingBatch[] = []): Order['orderStatus'] {
+  const savedStatus = order.campaignStatuses?.[getCampaignStatusKey(artist, campaign)];
+  if (savedStatus) return savedStatus;
+  const matchingBatch = batches.find(batch => batch.campaign === campaign && (batch.artist === artist || batch.artist === 'ALL'));
+  return matchingBatch?.statusCode || order.orderStatus;
 }
 
 export function withAllCampaignStatuses(order: Order, status: Order['orderStatus']): Order {

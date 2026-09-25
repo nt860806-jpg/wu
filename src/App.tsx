@@ -701,6 +701,7 @@ export default function App() {
         {currentPage === 'order-status' && (
           <OrderStatusPage
             orders={orders}
+            batches={batches}
             initialSearchQuery={orderSearchQuery}
             onUpdateOrderBankCode={handleUpdateOrderBankCode}
             onOpenShare={() => setIsShareModalOpen(true)}
@@ -721,8 +722,8 @@ export default function App() {
           <AdminPage
             products={products}
             orders={orders}
-            walletTransactions={walletTransactions}
             batches={batches}
+            walletTransactions={walletTransactions}
             onNavigate={handleNavigate}
             onUpdateOrderStatus={handleUpdateOrderStatus}
             onUpdateOrderDetails={handleUpdateOrderDetails}
@@ -759,6 +760,7 @@ export default function App() {
           <LoginPage
             currentUser={currentUser}
             orders={orders}
+            batches={batches}
             walletTransactions={walletTransactions}
             walletBalance={walletBalance}
             onChooseCancellationResolution={handleCancellationResolution}

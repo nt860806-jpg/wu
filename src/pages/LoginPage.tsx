@@ -16,7 +16,7 @@ import {
   ShieldCheck,
   Tag
 } from 'lucide-react';
-import { UserProfile, ActivePage, Order, OrderStatus, WalletTransaction } from '../types';
+import { UserProfile, ActivePage, Order, OrderStatus, ShippingBatch, WalletTransaction } from '../types';
 import { MOCK_USERS } from '../data/mockData';
 import { PageHeader } from '../components/PageHeader';
 import { supabase } from '../lib/supabase';
@@ -25,6 +25,7 @@ import { getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedBy
 interface LoginPageProps {
   currentUser: UserProfile;
   orders: Order[];
+  batches: ShippingBatch[];
   walletTransactions: WalletTransaction[];
   walletBalance: number;
   onChooseCancellationResolution: (orderId: string, resolution: 'store_credit' | 'refund_contact') => Promise<boolean>;
@@ -63,6 +64,7 @@ const getFavoriteArtistLabel = () => {
 export const LoginPage: React.FC<LoginPageProps> = ({
   currentUser,
   orders,
+  batches,
   walletTransactions,
   walletBalance,
   onChooseCancellationResolution,
@@ -554,7 +556,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
                       <div className="flex items-center gap-2">
                         {orderCampaignGroups.map(group => {
-                          const statusBadge = getOrderStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign));
+                          const statusBadge = getOrderStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign, batches));
                           return <span key={`${group.artist}-${group.campaign}`} className={`text-xs font-bold px-2.5 py-1 rounded-full border ${statusBadge.badgeColor}`}>
                             {group.artist}・{group.campaign}：{statusBadge.label}
                           </span>;
@@ -572,7 +574,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     {/* Order Items */}
                     <div className="space-y-3">
                       {orderCampaignGroups.map(group => {
-                        const statusBadge = getOrderStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign));
+                        const statusBadge = getOrderStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign, batches));
                         return (
                         <section key={`${group.artist}-${group.campaign}`} className="rounded-xl border border-slate-200 overflow-hidden">
                           <h4 className="px-3 py-2 bg-slate-50 text-[11px] font-bold text-slate-700 flex flex-wrap items-center justify-between gap-2">

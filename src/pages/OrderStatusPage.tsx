@@ -14,13 +14,14 @@ import {
   ShieldCheck,
   Send
 } from 'lucide-react';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, ShippingBatch } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { BRAND_CONFIG } from '../data/mockData';
 import { cleanPobDisplay, getOrderCampaignStatus, groupOrderItemsByCampaign } from '../utils/orderUtils';
 
 interface OrderStatusPageProps {
   orders: Order[];
+  batches: ShippingBatch[];
   initialSearchQuery?: string;
   onUpdateOrderBankCode: (orderId: string, bankLastFive: string) => void;
   onOpenShare: () => void;
@@ -28,6 +29,7 @@ interface OrderStatusPageProps {
 
 export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
   orders,
+  batches,
   initialSearchQuery = '',
   onUpdateOrderBankCode,
   onOpenShare,
@@ -237,7 +239,7 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
               {/* Each theme in a combined order has its own status */}
               <div className="flex flex-wrap justify-end gap-2">
                 {searchedOrderGroups.map(group => {
-                  const badge = getStatusBadge(getOrderCampaignStatus(searchedOrder, group.artist, group.campaign));
+                  const badge = getStatusBadge(getOrderCampaignStatus(searchedOrder, group.artist, group.campaign, batches));
                   return <span key={`${group.artist}-${group.campaign}`} className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border ${badge.color}`}>
                     <span className="w-2 h-2 rounded-full bg-current" />
                     {group.artist}・{group.campaign}：{badge.text}
@@ -258,7 +260,7 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
             {/* Stepper Timeline */}
             <div className="p-6 sm:p-8 space-y-6">
               {searchedOrderGroups.map(group => {
-                const campaignStatus = getOrderCampaignStatus(searchedOrder, group.artist, group.campaign);
+                const campaignStatus = getOrderCampaignStatus(searchedOrder, group.artist, group.campaign, batches);
                 const currentActiveIdx = getStepActiveIndex(campaignStatus);
                 const badge = getStatusBadge(campaignStatus);
                 return <section key={`${group.artist}-${group.campaign}`} className="space-y-3">
@@ -335,7 +337,7 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
               </h4>
               <div className="space-y-4">
                 {searchedOrderGroups.map(group => {
-                  const badge = getStatusBadge(getOrderCampaignStatus(searchedOrder, group.artist, group.campaign));
+                  const badge = getStatusBadge(getOrderCampaignStatus(searchedOrder, group.artist, group.campaign, batches));
                   return (
                   <section key={`${group.artist}-${group.campaign}`} className="rounded-xl border border-slate-200 overflow-hidden">
                     <h5 className="px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700 flex flex-wrap items-center justify-between gap-2">
