@@ -17,7 +17,7 @@ import {
 import { Order, OrderStatus, ShippingBatch } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { BRAND_CONFIG } from '../data/mockData';
-import { cleanPobDisplay, getOrderCampaignStatus, groupOrderItemsByCampaign } from '../utils/orderUtils';
+import { cleanPobDisplay, getCampaignSecondPaymentAmount, getOrderCampaignStatus, groupOrderItemsByCampaign } from '../utils/orderUtils';
 
 interface OrderStatusPageProps {
   orders: Order[];
@@ -426,12 +426,13 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
                   <span>訂單總額：</span>
                   <span className="font-mono text-rose-600">NT$ {searchedOrder.totalAmount.toLocaleString()}</span>
                 </div>
-                {typeof searchedOrder.secondPaymentAmount === 'number' && searchedOrder.secondPaymentAmount > 0 && (
-                  <div className="flex justify-between items-center p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-bold">
-                    <span>二補金額 (賣貨便)：</span>
-                    <span className="font-mono text-sm text-amber-700">NT$ {searchedOrder.secondPaymentAmount.toLocaleString()}</span>
-                  </div>
-                )}
+                {searchedOrderGroups.map(group => {
+                  const amount = getCampaignSecondPaymentAmount(searchedOrder, group.artist, group.campaign);
+                  return amount > 0 ? <div key={`${group.artist}-${group.campaign}`} className="flex justify-between items-center p-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-bold">
+                    <span>{group.campaign} 二補 (賣貨便)：</span>
+                    <span className="font-mono text-sm text-amber-700">NT$ {amount.toLocaleString()}</span>
+                  </div> : null;
+                })}
                 <div className="p-2.5 bg-slate-100 rounded-lg text-[11px] text-slate-600 space-y-1 mt-2">
                   <p className="font-semibold text-slate-800">📌 跟團須知：</p>
                   <p>• 先匯總金額，二補開賣貨便收取國際與國內物流費。</p>

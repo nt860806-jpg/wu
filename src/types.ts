@@ -124,13 +124,15 @@ export interface Order {
   orderStatus: OrderStatus;
   /** Separate progress per artist/theme when one checkout contains multiple group-buys. */
   campaignStatuses?: Record<string, OrderStatus>;
+  /** Separate second-payment amounts per artist/theme for independently created top-up listings. */
+  campaignSecondPaymentAmounts?: Record<string, number>;
   trackingNumber?: string;
   batchCode: string;
   notes?: string;
   pobPreference?: string; // 整筆訂單之特典順序
   secondPaymentAmount?: number; // 二補金額 (NT$)
   paymentAccount?: string; // 實際付款帳號名稱 (如 全支付(389)11016053741860 等)
-  cancellationStatus?: 'none' | 'awaiting_choice' | 'wallet_credited' | 'refund_contact_requested' | 'refund_completed';
+  cancellationStatus?: 'none' | 'cancelled_unpaid' | 'awaiting_choice' | 'wallet_credited' | 'refund_contact_requested' | 'refund_completed';
   cancellationReason?: string;
   cancelledAt?: string;
   cancellationResolvedAt?: string;

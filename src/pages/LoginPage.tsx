@@ -20,7 +20,7 @@ import { UserProfile, ActivePage, Order, OrderStatus, ShippingBatch, WalletTrans
 import { MOCK_USERS } from '../data/mockData';
 import { PageHeader } from '../components/PageHeader';
 import { supabase } from '../lib/supabase';
-import { getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
+import { getCampaignSecondPaymentAmount, getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
 
 interface LoginPageProps {
   currentUser: UserProfile;
@@ -611,7 +611,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     {order.cancellationStatus && order.cancellationStatus !== 'none' && (
                       <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 space-y-3">
                         <div>
-                          <div className="font-bold text-rose-900">商品未能購得，這筆訂單已取消</div>
+                          <div className="font-bold text-rose-900">{order.cancellationStatus === 'cancelled_unpaid' ? '未付款訂單已取消' : '商品未能購得，這筆訂單已取消'}</div>
                           <p className="text-[11px] text-rose-800 mt-1">{order.cancellationReason || '請選擇將款項轉為購物金，或自行聯繫官方帳號辦理退款。'}</p>
                         </div>
                         {order.cancellationStatus === 'awaiting_choice' && (
@@ -648,12 +648,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </div>
 
                       <div className="flex flex-wrap items-baseline gap-4">
-                        {typeof order.secondPaymentAmount === 'number' && order.secondPaymentAmount > 0 ? (
-                          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800">
-                            <span>二補金額 (賣貨便)：</span>
-                            <span className="font-mono font-bold">NT$ {order.secondPaymentAmount}</span>
-                          </div>
-                        ) : null}
+                        {orderCampaignGroups.map(group => {
+                          const amount = getCampaignSecondPaymentAmount(order, group.artist, group.campaign);
+                          return amount > 0 ? <div key={`${group.artist}-${group.campaign}`} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-800">
+                            <span>{group.campaign} 二補：</span><span className="font-mono font-bold">NT$ {amount.toLocaleString()}</span>
+                          </div> : null;
+                        })}
                         <div className="flex items-baseline gap-1.5">
                           <span className="text-xs text-slate-500">訂單總額：</span>
                           <span className="text-base font-black font-mono text-rose-600">

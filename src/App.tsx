@@ -176,7 +176,7 @@ export default function App() {
     const isAdmin = ADMIN_EMAILS.includes(email);
 
     const mapOrderRows = (rows: { data: Order; cancellation_status: Order['cancellationStatus'] }[]) =>
-      rows.map(row => normalizeOrderPaymentStatus({ ...row.data, cancellationStatus: row.cancellation_status || row.data.cancellationStatus || 'none' }));
+      rows.map(row => normalizeOrderPaymentStatus({ ...row.data, cancellationStatus: row.cancellation_status && row.cancellation_status !== 'none' ? row.cancellation_status : row.data.cancellationStatus || 'none' }));
     const loadCloudOrders = async () => {
       const { data, error } = await supabase.from('orders').select('data,cancellation_status').order('created_at', { ascending: false });
       if (!error && data && active) {
@@ -388,17 +388,20 @@ export default function App() {
     if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return false;
     const order = orders.find(item => item.id === orderId);
     if (!order) return false;
+    const isUnpaid = order.paymentStatus === 'unpaid' && !order.bankLastFive;
     const updated: Order = {
       ...order,
       orderStatus: 'cancelled',
-      cancellationStatus: 'awaiting_choice',
-      cancellationReason: '商品未能向官方購得，請選擇轉為購物金或自行聯繫官方帳號退款。',
+      cancellationStatus: isUnpaid ? 'cancelled_unpaid' : 'awaiting_choice',
+      cancellationReason: isUnpaid
+        ? '此訂單在未付款時取消，無需退款或轉購物金。'
+        : '商品未能向官方購得，請選擇轉為購物金或自行聯繫官方帳號退款。',
       cancelledAt: new Date().toISOString(),
       cancelledBy: currentUser.email,
     };
     const { error } = await supabase.from('orders').update({
       data: updated,
-      cancellation_status: 'awaiting_choice',
+      cancellation_status: isUnpaid ? 'none' : updated.cancellationStatus,
       updated_at: new Date().toISOString(),
     }).eq('id', orderId);
     if (error) { window.alert(`取消訂單失敗：${error.message}`); return false; }
@@ -413,7 +416,7 @@ export default function App() {
       supabase.from('orders').select('data,cancellation_status').order('created_at', { ascending: false }),
       supabase.from('wallet_transactions').select('id,owner_email,order_id,amount,transaction_type,description,created_at').order('created_at', { ascending: false }),
     ]);
-    if (ordersResult.data) setOrders(ordersResult.data.map(row => ({ ...row.data as Order, cancellationStatus: row.cancellation_status || 'none' })));
+    if (ordersResult.data) setOrders(ordersResult.data.map(row => ({ ...row.data as Order, cancellationStatus: row.cancellation_status && row.cancellation_status !== 'none' ? row.cancellation_status : row.data.cancellationStatus || 'none' })));
     if (walletResult.data) setWalletTransactions(walletResult.data.map(row => ({ id: row.id, ownerEmail: row.owner_email, orderId: row.order_id || undefined, amount: row.amount, transactionType: row.transaction_type, description: row.description, createdAt: row.created_at })));
     return true;
   };

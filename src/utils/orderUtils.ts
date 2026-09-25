@@ -20,6 +20,24 @@ export function getCampaignStatusKey(artist: string, campaign: string): string {
   return `${artist.trim().toLowerCase()}::${campaign.trim().toLowerCase()}`;
 }
 
+export function getCampaignSecondPaymentAmount(order: Order, artist: string, campaign: string): number {
+  const key = getCampaignStatusKey(artist, campaign);
+  const scopedAmount = order.campaignSecondPaymentAmounts?.[key];
+  if (typeof scopedAmount === 'number') return scopedAmount;
+  const groups = groupOrderItemsByCampaign(order.items, order.campaign);
+  return groups.length === 1 ? order.secondPaymentAmount ?? 0 : 0;
+}
+
+export function withCampaignSecondPaymentAmount(order: Order, artist: string, campaign: string, amount: number): Order {
+  const campaignSecondPaymentAmounts = { ...order.campaignSecondPaymentAmounts };
+  campaignSecondPaymentAmounts[getCampaignStatusKey(artist, campaign)] = Math.max(0, Math.round(amount || 0));
+  return { ...order, campaignSecondPaymentAmounts };
+}
+
+export function getOrderCampaignSubtotal(items: OrderItem[]): number {
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
+
 export function getOrderCampaignStatus(order: Order, artist: string, campaign: string, batches: ShippingBatch[] = []): Order['orderStatus'] {
   const savedStatus = order.campaignStatuses?.[getCampaignStatusKey(artist, campaign)];
   if (savedStatus) return savedStatus;

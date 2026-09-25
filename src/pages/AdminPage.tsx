@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Package, 
-  DollarSign, 
-  Clock, 
-  CheckCircle2, 
-  Search, 
-  Plus, 
-  FileSpreadsheet, 
-  TrendingUp, 
-  ShieldCheck, 
-  Truck, 
+import {
+  Package,
+  DollarSign,
+  Clock,
+  CheckCircle2,
+  Search,
+  Plus,
+  FileSpreadsheet,
+  TrendingUp,
+  ShieldCheck,
+  Truck,
   ChevronRight,
   Edit,
   Filter,
@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { Order, ShippingBatch, ActivePage, OrderStatus, AdminMember, UserProfile, Product, WalletTransaction } from '../types';
 import { PageHeader } from '../components/PageHeader';
-import { cleanPobDisplay, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
+import { cleanPobDisplay, getCampaignSecondPaymentAmount, getCampaignStatusKey, getOrderCampaignSubtotal, getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, withCampaignSecondPaymentAmount } from '../utils/orderUtils';
 import { getTaipeiDate, isProductAvailable, supabase } from '../lib/supabase';
 import { canManageArtistGroups, useArtistGroups } from '../hooks/useArtistGroups';
 
@@ -62,11 +62,11 @@ interface AdminPageProps {
 }
 
 // Standardized 9-stage order statuses (identical with customer-facing order status)
-export const ORDER_STATUS_FLOW_STEPS: { 
-  status: OrderStatus; 
+export const ORDER_STATUS_FLOW_STEPS: {
+  status: OrderStatus;
   stepNum: number;
-  label: string; 
-  desc: string; 
+  label: string;
+  desc: string;
   badgeColor: string;
 }[] = [
   { status: 'order_created', stepNum: 1, label: '1. 訂單成立', desc: '官方團務開放，訂單成立待轉帳', badgeColor: 'bg-amber-50 text-amber-800 border-amber-200' },
@@ -262,7 +262,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     : Array.from(
         new Set([
           ...batches.filter(b => b.artist === selectedArtist).map(b => b.campaign).filter(Boolean),
-          ...orders.flatMap(o => 
+          ...orders.flatMap(o =>
             o.items.filter(i => i.artist === selectedArtist).map(i => i.campaign || o.campaign)
           ).filter(Boolean)
         ])
@@ -303,7 +303,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     if (o.orderStatus === 'cancelled' || o.cancellationStatus && o.cancellationStatus !== 'none') return false;
     // 第一層（根目錄/團體）Artist
     if (selectedArtist !== 'all') {
-      const matchArtist = o.items.some(i => i.artist === selectedArtist) || 
+      const matchArtist = o.items.some(i => i.artist === selectedArtist) ||
         batches.find(b => b.batchCode === o.batchCode)?.artist === selectedArtist;
       if (!matchArtist) return false;
     }
@@ -349,7 +349,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   };
 
   const handleToggleSelectOrder = (id: string) => {
-    setSelectedOrderIds(prev => 
+    setSelectedOrderIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -442,12 +442,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       // Group key includes Artist and Campaign so duplicate item names across campaigns never collide
       const groupKey = `${art}__${camp}__${item.title}`;
       if (!batchItemBreakdown[groupKey]) {
-        batchItemBreakdown[groupKey] = { 
-          artist: art, 
-          campaign: camp, 
-          title: item.title, 
-          count: 0, 
-          memberCounts: {} 
+        batchItemBreakdown[groupKey] = {
+          artist: art,
+          campaign: camp,
+          title: item.title,
+          count: 0,
+          memberCounts: {}
         };
       }
       batchItemBreakdown[groupKey].count += item.quantity;
@@ -481,13 +481,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       return;
     }
     if (!editingOrder) return;
+    const hasSingleCampaign = groupOrderItemsByCampaign(editingOrder.items, editingOrder.campaign).length === 1;
     const updates: Partial<Order> = {
       orderStatus: editStatus,
       notes: editNotes,
       bankLastFive: editBankLastFive.trim() || undefined,
       socialNickname: editSocialNickname.trim(),
       pobPreference: cleanPobDisplay(editPobPreference),
-      secondPaymentAmount: Number(editSecondPaymentAmount) || 0,
+      ...(hasSingleCampaign ? { secondPaymentAmount: Number(editSecondPaymentAmount) || 0 } : {}),
       paymentAccount: editPaymentAccount,
       paymentStatus: isPaymentConfirmedByOrderStatus(editStatus) ? 'paid' : editingOrder.paymentStatus
     };
@@ -539,9 +540,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       a.order.id.localeCompare(b.order.id)
     );
     const exportedOrderIds = new Set<string>();
+    const exportedCampaignKeys = new Set<string>();
     const rows = itemRows.map(({ order, group, item }) => {
       const isFirstLineForOrder = !exportedOrderIds.has(order.id);
+      const campaignKey = `${order.id}:${getCampaignStatusKey(group.artist, group.campaign)}`;
+      const isFirstLineForCampaign = !exportedCampaignKeys.has(campaignKey);
       exportedOrderIds.add(order.id);
+      exportedCampaignKeys.add(campaignKey);
       return [
         group.campaign,
         group.artist,
@@ -559,11 +564,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         order.email || '',
         cleanPobDisplay(item.pobPreference || order.pobPreference),
         isFirstLineForOrder ? order.totalAmount : '',
-        isFirstLineForOrder ? order.secondPaymentAmount ?? 0 : '',
+        isFirstLineForCampaign ? getCampaignSecondPaymentAmount(order, group.artist, group.campaign) : '',
         isFirstLineForOrder ? order.paymentAccount || '全支付(389)11016053741860' : '',
         isFirstLineForOrder ? (order.paymentStatus === 'paid' || isPaymentConfirmedByOrderStatus(order.orderStatus)) ? '已核帳' : order.paymentStatus === 'verifying' ? '核對中' : '未付款' : '',
         isFirstLineForOrder ? order.bankLastFive || '' : '',
-        isFirstLineForOrder ? getStatusBadge(order.orderStatus).label : '',
+        isFirstLineForCampaign ? getStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign, batches)).label : '',
         isFirstLineForOrder ? order.notes || '' : ''
       ];
     });
@@ -660,7 +665,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       window.alert('此訂單沒有可用的會員信箱，無法同步取消通知。');
       return;
     }
-    if (!window.confirm(`確定取消 ${order.id}？會員登入後會收到通知，並可選購物金或聯繫官方帳號退款。`)) return;
+    const isUnpaid = order.paymentStatus === 'unpaid' && !order.bankLastFive;
+    const message = isUnpaid
+      ? `確定取消 ${order.id}？此訂單尚未付款，系統會直接取消，不會建立退款或購物金。`
+      : `確定取消 ${order.id}？會員登入後可選擇轉為購物金，或聯繫官方帳號退款。`;
+    if (!window.confirm(message)) return;
     const saved = await onCancelOrder(order.id);
     if (saved) {
       setCancellationToast(`訂單 ${order.id} 已取消，會員中心已同步顯示處理選項。`);
@@ -670,7 +679,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
   const getCancellationStatusLabel = (order: Order) => {
     switch (order.cancellationStatus) {
-      case 'awaiting_choice': return '等待會員選擇';
+      case 'cancelled_unpaid': return '未付款，單純取消';
+      case 'awaiting_choice': return '等待會員選擇退款方式';
       case 'wallet_credited': return `已轉購物金 NT$ ${(order.walletCreditAmount || 0).toLocaleString()}`;
       case 'refund_contact_requested': return '會員選擇退款，待官方處理';
       case 'refund_completed': return '退款已處理';
@@ -863,8 +873,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               <span>{batchToast}</span>
             </div>
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => setBatchToast('')}
               className="text-emerald-700 hover:text-emerald-900 p-0.5"
             >
@@ -1344,19 +1354,26 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                         </td>
                       </tr>
                     ) : (
-                      filteredOrders.map(order => {
-                        const badge = getStatusBadge(order.orderStatus);
+                      filteredOrders.flatMap(order => {
+                        const campaignGroups = groupOrderItemsByCampaign(order.items, order.campaign).filter(group =>
+                          (selectedArtist === 'all' || group.artist === selectedArtist) &&
+                          (selectedCampaign === 'all' || group.campaign === selectedCampaign)
+                        );
+                        return campaignGroups.map((group, groupIndex) => {
+                        const campaignKey = getCampaignStatusKey(group.artist, group.campaign);
+                        const campaignSubtotal = getOrderCampaignSubtotal(group.items);
+                        const badge = getStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign, batches));
                         const isSelected = selectedOrderIds.includes(order.id);
                         return (
-                          <tr 
-                            key={order.id} 
+                          <tr
+                            key={`${order.id}-${campaignKey}`}
                             className={`transition-colors ${
                               isSelected ? 'bg-rose-50/50' : 'hover:bg-slate-50/80'
                             }`}
                           >
                             {/* Checkbox for Multi-Select */}
                             <td className="py-3.5 px-3 text-center">
-                              <button
+                              {groupIndex === 0 && <button
                                 type="button"
                                 onClick={() => handleToggleSelectOrder(order.id)}
                                 className="p-1 transition-colors"
@@ -1366,7 +1383,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                                 ) : (
                                   <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
                                 )}
-                              </button>
+                              </button>}
                             </td>
 
                             <td className="py-3.5 px-4">
@@ -1386,8 +1403,6 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                             </td>
 
                             <td className="py-3.5 px-4 max-w-xs">
-                              {groupOrderItemsByCampaign(order.items, order.campaign).map(group => (
-                                <div key={`${group.artist}-${group.campaign}`} className="mb-1.5">
                                   <div className="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded inline-block mb-0.5">
                                     {group.artist}・{group.campaign}
                                   </div>
@@ -1396,14 +1411,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                                       • {item.title} <span className="text-slate-400 font-mono">({item.selectedMember || '通版'} x{item.quantity})</span>
                                     </div>
                                   ))}
-                                </div>
-                              ))}
-                              {order.pobPreference && (
+                              {order.pobPreference && campaignGroups.length === 1 && (
                                 <div className="text-[11px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded mt-1 line-clamp-1 border border-amber-200">
                                   🎁 特典順位: {cleanPobDisplay(order.pobPreference)}
                                 </div>
                               )}
-                              {order.notes && (
+                              {order.notes && groupIndex === 0 && (
                                 <div className="text-[10px] text-slate-400 italic line-clamp-1 mt-0.5">
                                   備註: {order.notes}
                                 </div>
@@ -1411,9 +1424,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                             </td>
 
                             <td className="py-3.5 px-4 font-mono">
-                              <div className="font-bold text-slate-900">NT$ {order.totalAmount.toLocaleString()}</div>
+                              <div className="font-bold text-slate-900">NT$ {campaignSubtotal.toLocaleString()}</div>
                               <div className="text-[11px] text-slate-500">
-                                先付: NT$ {order.depositAmountPaid.toLocaleString()}
+                                本主題商品金額
                               </div>
                               {order.bankLastFive ? (
                                 <div className="text-[11px] text-rose-600 font-bold bg-rose-50 px-1.5 py-0.2 rounded inline-block mt-0.5 border border-rose-200">
@@ -1433,11 +1446,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                                     <input
                                       type="number"
                                       min={0}
-                                      value={order.secondPaymentAmount ?? 0}
+                                      value={getCampaignSecondPaymentAmount(order, group.artist, group.campaign)}
                                       onChange={(e) => {
                                         const val = Number(e.target.value);
                                         if (onUpdateOrderDetails) {
-                                          onUpdateOrderDetails(order.id, { secondPaymentAmount: val });
+                                          onUpdateOrderDetails(order.id, withCampaignSecondPaymentAmount(order, group.artist, group.campaign, val));
                                         }
                                       }}
                                       className="w-20 px-2 py-1 text-xs rounded-lg border border-amber-300 bg-amber-50/60 font-mono font-bold text-amber-950 focus:outline-rose-500 focus:bg-white"
@@ -1446,12 +1459,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                                     />
                                   </div>
                                   <div className="text-[10px] text-slate-400 font-sans">
-                                    {order.secondPaymentAmount && order.secondPaymentAmount > 0 ? '賣貨便二補' : '待設定'}
+                                    {getCampaignSecondPaymentAmount(order, group.artist, group.campaign) > 0 ? '本主題二補' : '待設定'}
                                   </div>
                                 </div>
                               ) : (
                                 <div className="font-bold text-amber-800">
-                                  NT$ {(order.secondPaymentAmount ?? 0).toLocaleString()}
+                                  NT$ {getCampaignSecondPaymentAmount(order, group.artist, group.campaign).toLocaleString()}
                                 </div>
                               )}
                             </td>
@@ -1464,7 +1477,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
                             <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                               {/* EDIT BUTTON (後台需可以編輯，可以選狀態，僅管理員有權限) */}
-                              {isAdmin ? (
+                              {isAdmin ? groupIndex === 0 ? (
                                 <div className="inline-flex gap-1.5">
                                   <button
                                     type="button"
@@ -1479,12 +1492,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                                     onClick={() => void handleCancelOrderClick(order)}
                                     className="px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 font-semibold text-[11px] transition-colors inline-flex items-center gap-1"
                                   >
-                                    <XCircle className="w-3 h-3" />取消
+                                    <XCircle className="w-3 h-3" />取消整張訂單
                                   </button>
                                 </div>
                               ) : (
-                                <span 
-                                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-400 text-[11px] inline-flex items-center gap-1 cursor-not-allowed" 
+                                <span className="text-[10px] text-slate-400">同一主訂單</span>
+                              ) : (
+                                <span
+                                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-400 text-[11px] inline-flex items-center gap-1 cursor-not-allowed"
                                   title="僅管理員有權限編輯訂單"
                                 >
                                   <ShieldCheck className="w-3 h-3 text-slate-400" />
@@ -1494,6 +1509,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                             </td>
                           </tr>
                         );
+                        });
                       })
                     )}
                   </tbody>
@@ -1732,8 +1748,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 pt-2">
               {admins.map(admin => (
-                <div 
-                  key={admin.id} 
+                <div
+                  key={admin.id}
                   className={`p-5 rounded-2xl border transition-all ${
                     admin.isActive ? 'bg-white border-slate-200 shadow-2xs' : 'bg-slate-50 border-slate-200 opacity-60'
                   }`}
@@ -1865,7 +1881,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 </div>
               </div>
 
-              {/* Bank Last 5 & Second Payment Amount */}
+              {/* Bank Last 5 & single-campaign Second Payment Amount */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-slate-700 block mb-1 font-bold">匯款帳號後五碼 (查帳用)</label>
@@ -1879,7 +1895,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   />
                 </div>
 
-                {/* Requirement 3: 後台訂單新增一欄填寫二補金額 */}
+                {groupOrderItemsByCampaign(editingOrder.items, editingOrder.campaign).length === 1 && <>
                 <div>
                   <label className="text-amber-800 block mb-1 font-bold flex items-center justify-between">
                     <span>二補金額 (NT$)</span>
@@ -1897,7 +1913,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                     />
                   </div>
                 </div>
+                </>}
               </div>
+              {groupOrderItemsByCampaign(editingOrder.items, editingOrder.campaign).length > 1 && <p className="text-[11px] text-slate-500">這筆訂單包含多個主題，請回訂單列表在各主題列分別設定二補金額。</p>}
 
               {/* Payment Account Selection */}
               <div>
