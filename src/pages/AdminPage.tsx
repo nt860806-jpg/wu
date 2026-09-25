@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { Order, ShippingBatch, ActivePage, OrderStatus, AdminMember, UserProfile, Product, WalletTransaction } from '../types';
 import { PageHeader } from '../components/PageHeader';
-import { cleanPobDisplay, getCampaignSecondPaymentAmount, getCampaignStatusKey, getOrderCampaignSubtotal, getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, withCampaignSecondPaymentAmount, isOrderInPaymentVerification } from '../utils/orderUtils';
+import { cleanPobDisplay, getCampaignSecondPaymentAmount, getCampaignStatusKey, getOrderCampaignSubtotal, getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, withCampaignSecondPaymentAmount, isOrderInPaymentVerification, isOrderAwaitingPayment } from '../utils/orderUtils';
 import { getTaipeiDate, isProductAvailable, supabase } from '../lib/supabase';
 import { canManageArtistGroups, useArtistGroups } from '../hooks/useArtistGroups';
 
@@ -666,7 +666,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       window.alert('此訂單沒有可用的會員信箱，無法同步取消通知。');
       return;
     }
-    const isUnpaid = order.paymentStatus === 'unpaid' && !order.bankLastFive;
+    const isUnpaid = isOrderAwaitingPayment(order);
     const canChooseRefund = isOrderInPaymentVerification(order);
     const message = isUnpaid
       ? `確定取消 ${order.id}？此訂單尚未付款，系統會直接取消，不會建立退款或購物金。`

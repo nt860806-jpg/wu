@@ -11,13 +11,23 @@ export function isPaymentConfirmedByOrderStatus(status: Order['orderStatus']): b
 }
 
 export function normalizeOrderPaymentStatus(order: Order): Order {
-  return isPaymentConfirmedByOrderStatus(order.orderStatus) && order.paymentStatus !== 'paid'
-    ? { ...order, paymentStatus: 'paid' }
-    : order;
+  let paymentStatus = order.paymentStatus;
+  if (order.orderStatus === 'payment_verifying' || order.orderStatus === 'paid_verifying') {
+    paymentStatus = 'verifying';
+  } else if (order.orderStatus === 'order_created' || order.orderStatus === 'pending_payment') {
+    paymentStatus = 'unpaid';
+  } else if (isPaymentConfirmedByOrderStatus(order.orderStatus)) {
+    paymentStatus = 'paid';
+  }
+  return paymentStatus === order.paymentStatus ? order : { ...order, paymentStatus };
 }
 
 export function isOrderInPaymentVerification(order: Order): boolean {
-  return order.paymentStatus === 'verifying' || order.orderStatus === 'payment_verifying';
+  return order.orderStatus === 'payment_verifying' || order.orderStatus === 'paid_verifying';
+}
+
+export function isOrderAwaitingPayment(order: Order): boolean {
+  return order.orderStatus === 'order_created' || order.orderStatus === 'pending_payment';
 }
 
 export function getCampaignStatusKey(artist: string, campaign: string): string {

@@ -22,7 +22,7 @@ import { AddProductPage } from './pages/AddProductPage';
 import { LoginPage } from './pages/LoginPage';
 import { ContactPage } from './pages/ContactPage';
 import { supabase, ADMIN_EMAILS, isProductAvailable } from './lib/supabase';
-import { groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, normalizeOrderPaymentStatus, withAllCampaignStatuses, withCampaignStatus, isOrderInPaymentVerification } from './utils/orderUtils';
+import { groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, normalizeOrderPaymentStatus, withAllCampaignStatuses, withCampaignStatus, isOrderInPaymentVerification, isOrderAwaitingPayment } from './utils/orderUtils';
 
 export default function App() {
   // Navigation State
@@ -349,10 +349,7 @@ export default function App() {
             ...o,
             trackingNumber: trackingNumber || o.trackingNumber,
           }, status);
-          return {
-            ...updatedOrder,
-            paymentStatus: isPaymentConfirmedByOrderStatus(status) ? 'paid' : o.paymentStatus
-          };
+          return normalizeOrderPaymentStatus(updatedOrder);
         }
         return o;
       })
@@ -360,10 +357,9 @@ export default function App() {
     const order = orders.find(item => item.id === orderId);
     if (order) {
       const statusUpdatedOrder = withAllCampaignStatuses({ ...order, trackingNumber: trackingNumber || order.trackingNumber }, status);
-      const updated = {
+      const updated = normalizeOrderPaymentStatus({
         ...statusUpdatedOrder,
-        paymentStatus: isPaymentConfirmedByOrderStatus(status) ? 'paid' : order.paymentStatus,
-      };
+      });
       void supabase.from('orders').update({ data: updated, updated_at: new Date().toISOString() }).eq('id', orderId);
     }
   };
@@ -388,7 +384,7 @@ export default function App() {
     if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return false;
     const order = orders.find(item => item.id === orderId);
     if (!order) return false;
-    const isUnpaid = order.paymentStatus === 'unpaid' && !order.bankLastFive;
+    const isUnpaid = isOrderAwaitingPayment(order);
     const refundEligibleAtCancellation = isOrderInPaymentVerification(order);
     const updated: Order = {
       ...order,
@@ -492,10 +488,7 @@ export default function App() {
         updated = withAllCampaignStatuses(order, newStatus);
       }
       if (!groups.length) updated = { ...updated, orderStatus: newStatus };
-      return normalizeOrderPaymentStatus({
-        ...updated,
-        paymentStatus: isPaymentConfirmedByOrderStatus(newStatus) ? 'paid' : updated.paymentStatus,
-      });
+      return normalizeOrderPaymentStatus(updated);
     };
 
     const statusText = getStatusTextFromCode(newStatus);
