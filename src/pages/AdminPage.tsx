@@ -243,6 +243,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     products.filter(isProductAvailable).filter(product => product.campaign)
       .map(product => `${product.artist.toLowerCase()}::${product.campaign.toLowerCase()}`)
   );
+  const currentProductRows = products.filter(isProductAvailable);
+  const currentProductListingCount = new Set(currentProductRows.map(product => product.listingGroupId || product.id)).size;
   const currentTopicBatches = batches.filter(batch => currentTopicKeys.has(`${batch.artist.toLowerCase()}::${(batch.campaign || '').toLowerCase()}`));
   const activeControllerBatches = currentTopicBatches.filter(batch => !batch.isShippingComplete);
   const completedCurrentTopicBatches = currentTopicBatches.filter(batch => batch.isShippingComplete);
@@ -783,7 +785,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
               }`}
             >
               <ShoppingBag className="w-4 h-4" />
-              <span>周邊介紹管理 ({products.length})</span>
+              <span>周邊介紹管理（{currentProductListingCount} 團）</span>
             </button>
 
             <button
@@ -876,7 +878,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">周邊介紹管理</h2>
-                <p className="text-xs text-slate-500 mt-1">設定商品內容與下架日期；到期商品會自動移入已下架清單，可隨時重新開啟。</p>
+                <p className="text-xs text-slate-500 mt-1">目前上架 {currentProductListingCount} 團、{currentProductRows.length} 項商品。可設定商品內容與下架日期；到期商品會自動移入已下架清單。</p>
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setProductView('available')} className={`px-3 py-2 rounded-xl text-xs font-bold ${productView === 'available' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600'}`}>上架中</button>
