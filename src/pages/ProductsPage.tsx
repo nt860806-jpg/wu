@@ -355,9 +355,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {sorted.map(listing => {
                 const product = listing.representative;
-                const progressUnits = listing.products.reduce((sum, item) => sum + item.currentUnits, 0);
-                const targetUnits = listing.products.reduce((sum, item) => sum + item.targetUnits, 0);
-                const progressPct = Math.min(100, Math.round((progressUnits / Math.max(targetUnits, 1)) * 100));
                 const prices = listing.products.map(item => item.price);
                 const minPrice = Math.min(...prices);
                 const maxPrice = Math.max(...prices);
@@ -431,19 +428,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                           {product.description}
                         </p>
 
-                        {/* Progress */}
-                        <div className="space-y-1 pt-1">
-                          <div className="flex justify-between text-[11px] font-mono text-slate-500">
-                            <span>集單進度：{progressUnits}/{targetUnits} 件</span>
-                            <span className="font-bold text-rose-600">{progressPct}%</span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                            <div
-                              className="bg-rose-500 h-full rounded-full"
-                              style={{ width: `${progressPct}%` }}
-                            />
-                          </div>
-                        </div>
                       </div>
                     </div>
 

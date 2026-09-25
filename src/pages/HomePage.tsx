@@ -303,9 +303,6 @@ export const HomePage: React.FC<HomePageProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {filteredListings.slice(0, 8).map(listing => {
               const product = listing.representative;
-              const progressUnits = listing.products.reduce((sum, item) => sum + item.currentUnits, 0);
-              const targetUnits = listing.products.reduce((sum, item) => sum + item.targetUnits, 0);
-              const progressPct = Math.min(100, Math.round((progressUnits / Math.max(targetUnits, 1)) * 100));
               const listingImages = getListingImages(listing.products);
               const listingImageIndex = Math.min(listingImageIndices[listing.key] || 0, listingImages.length - 1);
               const prices = listing.products.map(item => item.price);
@@ -373,19 +370,6 @@ export const HomePage: React.FC<HomePageProps> = ({
                         🎁 {product.pobDetail}
                       </p>
 
-                      {/* Progress Bar */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                          <span>已集單 {progressUnits}/{targetUnits} 件</span>
-                          <span className="font-bold text-rose-600">{progressPct}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className="bg-gradient-to-r from-rose-500 to-amber-500 h-full rounded-full"
-                            style={{ width: `${progressPct}%` }}
-                          />
-                        </div>
-                      </div>
                     </div>
                   </div>
 
