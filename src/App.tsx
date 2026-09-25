@@ -312,22 +312,22 @@ export default function App() {
   };
 
   // Order operations
-  const handleCreateOrder = async (newOrder: Order, walletCreditApplied: number): Promise<boolean> => {
-    const { data, error } = await supabase.rpc('create_member_order', {
-      p_order: newOrder,
+  const handleCreateOrders = async (newOrders: Order[], walletCreditApplied: number): Promise<Order[] | null> => {
+    const { data, error } = await supabase.rpc('create_member_orders', {
+      p_orders: newOrders,
       p_wallet_apply: walletCreditApplied,
     });
     if (error || !data) {
       window.alert(error?.message || '訂單建立失敗，請稍後再試。');
-      return false;
+      return null;
     }
-    const savedOrder = { ...newOrder, ...(data as Partial<Order>) };
-    setOrders(prev => [savedOrder, ...prev.filter(order => order.id !== savedOrder.id)]);
+    const savedOrders = (data as Partial<Order>[]).map((savedOrder, index) => ({ ...newOrders[index], ...savedOrder }));
+    setOrders(prev => [...savedOrders, ...prev.filter(order => !savedOrders.some(saved => saved.id === order.id))]);
     setCurrentUser(prev => ({
       ...prev,
-      accumulatedOrders: (prev.accumulatedOrders || 0) + 1,
+      accumulatedOrders: (prev.accumulatedOrders || 0) + savedOrders.length,
     }));
-    return true;
+    return savedOrders;
   };
 
   const handleNavigateToOrder = (orderId: string) => {
@@ -798,7 +798,7 @@ export default function App() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveCartItem}
         onClearCart={handleClearCart}
-        onCreateOrder={handleCreateOrder}
+        onCreateOrders={handleCreateOrders}
         onNavigateToOrder={handleNavigateToOrder}
         onNavigateToLogin={() => { setIsCartOpen(false); handleNavigate('login'); }}
         currentUser={currentUser}

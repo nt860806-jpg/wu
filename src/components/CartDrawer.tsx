@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, ShieldCheck, Check, AlertCircle, Sparkles } from 'lucide-react';
 import { CartItem, Order, OrderItem, UserProfile } from '../types';
 import { BRAND_CONFIG } from '../data/mockData';
-import { generateOrderId, cleanPobDisplay } from '../utils/orderUtils';
+import { generateOrderId, groupOrderItemsByCampaign, cleanPobDisplay } from '../utils/orderUtils';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -11,7 +11,7 @@ interface CartDrawerProps {
   onUpdateQuantity: (cartItemId: string, delta: number) => void;
   onRemoveItem: (cartItemId: string) => void;
   onClearCart: () => void;
-  onCreateOrder: (order: Order, walletCreditApplied: number) => Promise<boolean>;
+  onCreateOrders: (orders: Order[], walletCreditApplied: number) => Promise<Order[] | null>;
   onNavigateToOrder: (orderId: string) => void;
   onNavigateToLogin: () => void;
   existingOrders?: Order[];
@@ -26,7 +26,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onUpdateQuantity,
   onRemoveItem,
   onClearCart,
-  onCreateOrder,
+  onCreateOrders,
   onNavigateToOrder,
   onNavigateToLogin,
   existingOrders = [],
@@ -50,7 +50,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [orderNotes, setOrderNotes] = useState('');
   const [agreedTerms, setAgreedTerms] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  const [createdOrders, setCreatedOrders] = useState<Order[]>([]);
   const [useWalletCredit, setUseWalletCredit] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
@@ -95,7 +95,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   const handleCloseAndReset = () => {
     setStep('cart');
-    setCreatedOrder(null);
+    setCreatedOrders([]);
     onClose();
   };
 
@@ -129,10 +129,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       return;
     }
 
-    // Requirement 5: 下單訂單編號邏輯：團體縮寫-西元年份-五位數從0000開始遞增 (例: TW-2026-00000)
-    const primaryArtist = cartItems[0]?.product.artist || 'TWICE';
-    const orderId = generateOrderId(primaryArtist, existingOrders);
-
     // Requirement 4: 團務後台特典小卡排卡順位 / 備註志願不顯示「自訂特典排卡順位 (請在下方備註詳細說明)」 只顯示備註內容
     const finalPobPref = pobChoice === '自訂' 
       ? customPobNotes.trim() 
@@ -150,45 +146,54 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       imageUrl: item.product.imageUrl
     }));
 
-    const activePaymentAccount = cartItems[0]?.product.paymentMethod || '全支付(389)11016053741860';
-
-    const newOrder: Order = {
-      id: orderId,
-      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-      customerName: customerName.trim(),
-      socialNickname: socialNickname.trim(),
-      phone: phone.trim(),
-      email: currentUser.email,
-      items: orderItems,
-      subtotal,
-      shippingFee: 0, // 不需運費
-      totalAmount: finalTotal, // 只有全額付清
-      isDepositOnly: false, // 只有全額付清
-      depositAmountPaid: finalTotal,
-      remainingAmount: 0,
-      paymentMethod: paymentChoice === 'transfer' ? 'atm' : 'cash_on_delivery',
-      paymentChoice,
-      paymentStatus: paymentChoice === 'transfer' && bankLastFive ? 'verifying' : 'unpaid',
-      bankLastFive: paymentChoice === 'transfer' ? bankLastFive.trim() || undefined : undefined,
-      shippingMethod: '7-11',
-      orderStatus: paymentChoice === 'transfer' && bankLastFive ? 'payment_verifying' : 'order_created',
-      batchCode: '2409-TWICE-A',
-      campaign: cartItems[0]?.product.campaign || 'Official_Campaign',
-      notes: orderNotes.trim(),
-      pobPreference: finalPobPref,
-      secondPaymentAmount: 0,
-      paymentAccount: paymentChoice === 'transfer' ? activePaymentAccount : undefined,
-      walletCreditApplied,
-    };
+    const groupedOrderItems = groupOrderItemsByCampaign(orderItems, 'Official_Campaign');
+    const createdAt = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    let walletRemaining = walletCreditApplied;
+    const reservedOrders = [...existingOrders];
+    const newOrders: Order[] = groupedOrderItems.map(group => {
+      const groupSubtotal = group.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const groupWalletCredit = Math.min(walletRemaining, groupSubtotal);
+      walletRemaining -= groupWalletCredit;
+      const newOrder: Order = {
+        id: generateOrderId(group.artist, reservedOrders),
+        createdAt,
+        customerName: customerName.trim(),
+        socialNickname: socialNickname.trim(),
+        phone: phone.trim(),
+        email: currentUser.email,
+        items: group.items,
+        subtotal: groupSubtotal,
+        shippingFee: 0,
+        totalAmount: groupSubtotal - groupWalletCredit,
+        isDepositOnly: false,
+        depositAmountPaid: groupSubtotal - groupWalletCredit,
+        remainingAmount: 0,
+        paymentMethod: paymentChoice === 'transfer' ? 'atm' : 'cash_on_delivery',
+        paymentChoice,
+        paymentStatus: paymentChoice === 'transfer' && bankLastFive ? 'verifying' : 'unpaid',
+        bankLastFive: paymentChoice === 'transfer' ? bankLastFive.trim() || undefined : undefined,
+        shippingMethod: '7-11',
+        orderStatus: paymentChoice === 'transfer' && bankLastFive ? 'payment_verifying' : 'order_created',
+        batchCode: `2409-${group.artist.replace(/[^a-z0-9]/gi, '').toUpperCase()}-A`,
+        campaign: group.campaign,
+        notes: orderNotes.trim(),
+        pobPreference: finalPobPref,
+        secondPaymentAmount: 0,
+        paymentAccount: paymentChoice === 'transfer' ? currentPaymentAccount : undefined,
+        walletCreditApplied: groupWalletCredit,
+      };
+      reservedOrders.push(newOrder);
+      return newOrder;
+    });
 
     setIsSubmittingOrder(true);
-    const saved = await onCreateOrder(newOrder, walletCreditApplied);
+    const savedOrders = await onCreateOrders(newOrders, walletCreditApplied);
     setIsSubmittingOrder(false);
-    if (!saved) {
+    if (!savedOrders?.length) {
       setErrorMessage('訂單尚未成功儲存，請稍後再試；購物金尚未扣除。');
       return;
     }
-    setCreatedOrder(newOrder);
+    setCreatedOrders(savedOrders);
     onClearCart();
     setStep('success');
   };
@@ -600,7 +605,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           )}
 
           {/* STEP 3: SUCCESS STATE (Requirement 6: 可繼續選購其他商品) */}
-          {step === 'success' && createdOrder && (
+          {step === 'success' && createdOrders.length > 0 && (
             <div className="py-8 text-center space-y-5">
               <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
                 <Check className="w-8 h-8" />
@@ -616,27 +621,31 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left space-y-2 text-xs max-w-md mx-auto">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-200">
                   <span className="text-slate-500">專屬訂單編號：</span>
-                  <strong className="font-mono text-sm text-rose-600">{createdOrder.id}</strong>
+                  <strong className="font-mono text-sm text-rose-600">{createdOrders.length} 筆</strong>
                 </div>
+                {createdOrders.map(order => <div key={order.id} className="flex justify-between items-center gap-3 py-1 border-b border-slate-200 last:border-0">
+                  <span className="text-slate-700">{order.items[0]?.artist}・{order.campaign}</span>
+                  <strong className="font-mono text-rose-600">{order.id} · NT$ {order.totalAmount.toLocaleString()}</strong>
+                </div>)}
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500">訂購人：</span>
-                  <span>{createdOrder.customerName} ({createdOrder.phone})</span>
+                  <span>{createdOrders[0].customerName} ({createdOrders[0].phone})</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500">社群暱稱：</span>
-                  <strong className="text-rose-600">{createdOrder.socialNickname}</strong>
+                  <strong className="text-rose-600">{createdOrders[0].socialNickname}</strong>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500">特典順位 / 備註：</span>
-                  <span className="font-medium text-slate-800">{createdOrder.pobPreference}</span>
+                  <span className="font-medium text-slate-800">{createdOrders[0].pobPreference}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-slate-200">
                   <span className="text-slate-500">全額付款金額：</span>
-                  <strong className="text-slate-900 font-mono text-sm">NT$ {createdOrder.totalAmount.toLocaleString()}</strong>
+                  <strong className="text-slate-900 font-mono text-sm">NT$ {createdOrders.reduce((sum, order) => sum + order.totalAmount, 0).toLocaleString()}</strong>
                 </div>
                 <div className="flex justify-between items-center text-slate-500 text-[11px]">
                   <span>付款方式：</span>
-                  <span>{createdOrder.paymentChoice === 'cash_on_delivery' ? '貨付' : '轉帳'}</span>
+                  <span>{createdOrders[0].paymentChoice === 'cash_on_delivery' ? '貨付' : '轉帳'}</span>
                 </div>
               </div>
 
@@ -646,7 +655,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   type="button"
                   onClick={() => {
                     handleCloseAndReset();
-                    onNavigateToOrder(createdOrder.id);
+                    onNavigateToOrder(createdOrders[0].id);
                   }}
                   className="w-full sm:w-auto px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-colors"
                 >
