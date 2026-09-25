@@ -159,16 +159,6 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     return () => { isActive = false; };
   }, [artist]);
 
-  // Quick preset images
-  const presetImages = [
-    { label: '手燈應援', url: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000&auto=format&fit=crop' },
-    { label: '棒球外套', url: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?q=80&w=1000&auto=format&fit=crop' },
-    { label: '回歸專輯', url: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop' },
-    { label: '周邊娃娃', url: 'https://images.unsplash.com/photo-1535223289827-42f1e9919769?q=80&w=1000&auto=format&fit=crop' },
-    { label: '巡演現場', url: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?q=80&w=1000&auto=format&fit=crop' },
-    { label: '寫真畫冊', url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?q=80&w=1000&auto=format&fit=crop' }
-  ];
-
   // Auto-save form draft to localStorage
   useEffect(() => {
     if (editingProduct) return;
@@ -742,7 +732,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 </div>
 
                 {/* Upload image files directly from this device */}
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex justify-end">
                   <input
                     ref={imageFileInput}
                     type="file"
@@ -755,14 +745,6 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     type="button"
                     onClick={() => imageFileInput.current?.click()}
                     disabled={isUploadingImages || galleryImages.length >= 12}
-                    className="flex-1 min-h-12 px-4 py-3 rounded-xl border border-slate-300 bg-white text-slate-600 text-left text-xs sm:text-sm hover:border-rose-300 disabled:opacity-60"
-                  >
-                    {isUploadingImages ? '圖片上傳中…' : '選擇商品圖片檔案（可複選，單張上限 10 MB）'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => imageFileInput.current?.click()}
-                    disabled={isUploadingImages || galleryImages.length >= 12}
                     className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs sm:text-sm font-bold shrink-0 flex items-center justify-center gap-1 disabled:opacity-60"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -770,25 +752,6 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   </button>
                 </div>
                 {imageUploadError && <p role="alert" className="text-xs font-semibold text-rose-700">{imageUploadError}</p>}
-
-                {/* Quick Presets */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[11px] text-slate-400">快速選圖加入：</span>
-                  {presetImages.map(p => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => {
-                        if (!galleryImages.includes(p.url)) {
-                          setGalleryImages(prev => [...prev, p.url]);
-                        }
-                      }}
-                      className="text-[11px] px-2 py-0.5 rounded-lg bg-white border border-slate-200 hover:border-rose-300 text-slate-700"
-                    >
-                      + {p.label}
-                    </button>
-                  ))}
-                </div>
 
                 {/* Thumbnails grid */}
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 pt-2">
