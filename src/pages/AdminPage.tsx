@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { Order, ShippingBatch, ActivePage, OrderStatus, AdminMember, UserProfile, Product, WalletTransaction } from '../types';
 import { PageHeader } from '../components/PageHeader';
-import { cleanPobDisplay, getCampaignSecondPaymentAmount, getCampaignStatusKey, getOrderCampaignSubtotal, getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, withCampaignSecondPaymentAmount } from '../utils/orderUtils';
+import { cleanPobDisplay, getCampaignSecondPaymentAmount, getCampaignStatusKey, getOrderCampaignSubtotal, getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, withCampaignSecondPaymentAmount, isOrderInPaymentVerification } from '../utils/orderUtils';
 import { getTaipeiDate, isProductAvailable, supabase } from '../lib/supabase';
 import { canManageArtistGroups, useArtistGroups } from '../hooks/useArtistGroups';
 
@@ -667,9 +667,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       return;
     }
     const isUnpaid = order.paymentStatus === 'unpaid' && !order.bankLastFive;
+    const canChooseRefund = isOrderInPaymentVerification(order);
     const message = isUnpaid
       ? `確定取消 ${order.id}？此訂單尚未付款，系統會直接取消，不會建立退款或購物金。`
-      : `確定取消 ${order.id}？會員登入後可選擇轉為購物金，或聯繫官方帳號退款。`;
+      : canChooseRefund
+        ? `確定取消 ${order.id}？此訂單在匯款核對階段，會員登入後可選擇轉為購物金，或聯繫官方帳號退款。`
+        : `確定取消 ${order.id}？此訂單不在匯款核對階段，會員登入後僅可選擇轉為購物金。`;
     if (!window.confirm(message)) return;
     const saved = await onCancelOrder(order.id);
     if (saved) {

@@ -619,9 +619,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                             <button type="button" disabled={resolvingOrderId === order.id} onClick={() => void handleChooseCancellation(order.id, 'store_credit')} className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold">
                               轉為購物金 NT$ {(order.subtotal || order.totalAmount).toLocaleString()}
                             </button>
-                            <button type="button" disabled={resolvingOrderId === order.id} onClick={() => void handleChooseCancellation(order.id, 'refund_contact')} className="px-3 py-2 rounded-lg bg-white border border-rose-300 text-rose-800 text-xs font-bold disabled:opacity-50">
-                              自行聯繫官方帳號退款
-                            </button>
+                            {(order.refundEligibleAtCancellation ?? order.paymentStatus === 'verifying') && (
+                              <button type="button" disabled={resolvingOrderId === order.id} onClick={() => void handleChooseCancellation(order.id, 'refund_contact')} className="px-3 py-2 rounded-lg bg-white border border-rose-300 text-rose-800 text-xs font-bold disabled:opacity-50">
+                                自行聯繫官方帳號退款
+                              </button>
+                            )}
                           </div>
                         )}
                         {order.cancellationStatus === 'wallet_credited' && <p className="text-xs font-bold text-emerald-800">已轉入購物金 NT$ {(order.walletCreditAmount || 0).toLocaleString()}，可在下次結帳折抵。</p>}

@@ -134,6 +134,7 @@ export interface Order {
   secondPaymentAmount?: number; // 二補金額 (NT$)
   paymentAccount?: string; // 實際付款帳號名稱 (如 全支付(389)11016053741860 等)
   cancellationStatus?: 'none' | 'cancelled_unpaid' | 'awaiting_choice' | 'wallet_credited' | 'refund_contact_requested' | 'refund_completed';
+  refundEligibleAtCancellation?: boolean;
   cancellationReason?: string;
   cancelledAt?: string;
   cancellationResolvedAt?: string;

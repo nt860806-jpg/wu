@@ -16,6 +16,10 @@ export function normalizeOrderPaymentStatus(order: Order): Order {
     : order;
 }
 
+export function isOrderInPaymentVerification(order: Order): boolean {
+  return order.paymentStatus === 'verifying' || order.orderStatus === 'payment_verifying';
+}
+
 export function getCampaignStatusKey(artist: string, campaign: string): string {
   return `${artist.trim().toLowerCase()}::${campaign.trim().toLowerCase()}`;
 }

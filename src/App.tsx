@@ -22,7 +22,7 @@ import { AddProductPage } from './pages/AddProductPage';
 import { LoginPage } from './pages/LoginPage';
 import { ContactPage } from './pages/ContactPage';
 import { supabase, ADMIN_EMAILS, isProductAvailable } from './lib/supabase';
-import { groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, normalizeOrderPaymentStatus, withAllCampaignStatuses, withCampaignStatus } from './utils/orderUtils';
+import { groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, normalizeOrderPaymentStatus, withAllCampaignStatuses, withCampaignStatus, isOrderInPaymentVerification } from './utils/orderUtils';
 
 export default function App() {
   // Navigation State
@@ -389,13 +389,17 @@ export default function App() {
     const order = orders.find(item => item.id === orderId);
     if (!order) return false;
     const isUnpaid = order.paymentStatus === 'unpaid' && !order.bankLastFive;
+    const refundEligibleAtCancellation = isOrderInPaymentVerification(order);
     const updated: Order = {
       ...order,
       orderStatus: 'cancelled',
       cancellationStatus: isUnpaid ? 'cancelled_unpaid' : 'awaiting_choice',
+      refundEligibleAtCancellation,
       cancellationReason: isUnpaid
         ? '此訂單在未付款時取消，無需退款或轉購物金。'
-        : '商品未能向官方購得，請選擇轉為購物金或自行聯繫官方帳號退款。',
+        : refundEligibleAtCancellation
+          ? '商品未能向官方購得，請選擇轉為購物金或自行聯繫官方帳號退款。'
+          : '商品未能向官方購得；此訂單不在匯款核對階段，僅提供轉為購物金。',
       cancelledAt: new Date().toISOString(),
       cancelledBy: currentUser.email,
     };
