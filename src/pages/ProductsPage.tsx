@@ -29,6 +29,10 @@ interface ProductListing {
   representative: Product;
 }
 
+const getListingImages = (products: Product[]) => Array.from(new Set(
+  products.flatMap(product => product.gallery?.length ? product.gallery : [product.imageUrl]).filter(Boolean)
+));
+
 export const ProductsPage: React.FC<ProductsPageProps> = ({
   products,
   selectedProduct,
@@ -49,6 +53,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
   const [selectedListingItems, setSelectedListingItems] = useState<string[]>([]);
   const [listingQuantities, setListingQuantities] = useState<Record<string, number>>({});
   const [listingMembers, setListingMembers] = useState<Record<string, string>>({});
+  const [listingImageIndices, setListingImageIndices] = useState<Record<string, number>>({});
+  const [modalImageIndex, setModalImageIndex] = useState(0);
   const [addedToast, setAddedToast] = useState(false);
 
   const artists: Artist[] = ['ALL', ...activeGroups.map(group => group.name)];
@@ -119,15 +125,18 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
   const openModalForProduct = (p: Product) => {
     onSelectProduct(p);
-    const listingItems = productListings.find(listing => listing.products.some(item => item.id === p.id))?.products || [p];
+    const listing = productListings.find(candidate => candidate.products.some(item => item.id === p.id));
+    const listingItems = listing?.products || [p];
     setSelectedListingItems([]);
     setListingQuantities(Object.fromEntries(listingItems.map(item => [item.id, 1])));
     setListingMembers(Object.fromEntries(listingItems.map(item => [item.id, item.memberOptions?.[0] || ''])));
+    setModalImageIndex(listing ? listingImageIndices[listing.key] || 0 : 0);
   };
 
   const selectedListingProducts = selectedProduct
     ? (productListings.find(listing => listing.products.some(item => item.id === selectedProduct.id))?.products || [selectedProduct])
     : [];
+  const selectedListingImages = getListingImages(selectedListingProducts);
 
   const toggleListingProduct = (productId: string) => {
     setSelectedListingItems(current => current.includes(productId)
@@ -352,6 +361,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                 const prices = listing.products.map(item => item.price);
                 const minPrice = Math.min(...prices);
                 const maxPrice = Math.max(...prices);
+                const listingImages = getListingImages(listing.products);
+                const listingImageIndex = Math.min(listingImageIndices[listing.key] || 0, listingImages.length - 1);
                 return (
                   <div
                     key={listing.key}
@@ -361,8 +372,8 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                       {/* Product Thumbnail */}
                       <div className="relative aspect-square w-full overflow-hidden bg-slate-100">
                         <img
-                          src={product.imageUrl}
-                          alt={listing.products.length > 1 ? `${product.campaign} 團務商品` : product.title}
+                          src={listingImages[listingImageIndex] || product.imageUrl}
+                          alt={product.listingGroupId ? product.campaign || product.title : product.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           referrerPolicy="no-referrer"
                         />
@@ -387,10 +398,27 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                         </div>
                       </div>
 
+                      {listingImages.length > 1 && (
+                        <div className="flex gap-1.5 overflow-x-auto px-3 pt-3" aria-label="本主題批號商品圖片">
+                          {listingImages.map((image, imageIndex) => (
+                            <button
+                              key={`${image}-${imageIndex}`}
+                              type="button"
+                              onClick={() => setListingImageIndices(current => ({ ...current, [listing.key]: imageIndex }))}
+                              aria-label={`顯示第 ${imageIndex + 1} 張商品圖片`}
+                              aria-pressed={listingImageIndex === imageIndex}
+                              className={`h-12 w-12 shrink-0 overflow-hidden rounded-lg border-2 ${listingImageIndex === imageIndex ? 'border-rose-500' : 'border-slate-200'}`}
+                            >
+                              <img src={image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Content */}
                       <div className="p-4 space-y-2.5">
                         <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-rose-600 transition-colors">
-                          {listing.products.length > 1 ? `${product.campaign || product.title} 團務` : product.title}
+                          {product.listingGroupId ? product.campaign || product.title : product.title}
                         </h3>
 
                         {listing.products.length > 1 && (
@@ -474,13 +502,31 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {/* Image */}
-              <div className="aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
-                <img
-                  src={selectedProduct.imageUrl}
-                  alt={selectedProduct.title}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
+              <div className="space-y-2">
+                <div className="aspect-square rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+                  <img
+                    src={selectedListingImages[Math.min(modalImageIndex, selectedListingImages.length - 1)] || selectedProduct.imageUrl}
+                    alt={selectedProduct.title}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                {selectedListingImages.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1" aria-label="本主題批號所有商品圖片">
+                    {selectedListingImages.map((image, imageIndex) => (
+                      <button
+                        key={`${image}-${imageIndex}`}
+                        type="button"
+                        onClick={() => setModalImageIndex(imageIndex)}
+                        aria-label={`預覽第 ${imageIndex + 1} 張商品圖片`}
+                        aria-pressed={modalImageIndex === imageIndex}
+                        className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 ${modalImageIndex === imageIndex ? 'border-rose-500' : 'border-slate-200'}`}
+                      >
+                        <img src={image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Specs */}
@@ -501,7 +547,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                   </div>
 
                   <h3 className="text-lg font-bold text-slate-900">
-                    {selectedListingProducts.length > 1 ? `${selectedProduct.campaign || selectedProduct.title} 團務商品` : selectedProduct.title}
+                    {selectedProduct.listingGroupId ? selectedProduct.campaign || selectedProduct.title : selectedProduct.title}
                   </h3>
 
                   <div className="text-xl font-extrabold text-rose-600 font-mono">
