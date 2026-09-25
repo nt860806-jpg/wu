@@ -20,7 +20,7 @@ import { UserProfile, ActivePage, Order, OrderStatus, WalletTransaction } from '
 import { MOCK_USERS } from '../data/mockData';
 import { PageHeader } from '../components/PageHeader';
 import { supabase } from '../lib/supabase';
-import { groupOrderItemsByCampaign } from '../utils/orderUtils';
+import { groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
 
 interface LoginPageProps {
   currentUser: UserProfile;
@@ -194,7 +194,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const filteredHistoryOrders = memberOrders.filter(o => {
     if (o.cancellationStatus && o.cancellationStatus !== 'none' && selectedHistoryTab !== 'all') return false;
-    if (selectedHistoryTab === 'unpaid' && o.paymentStatus === 'paid') return false;
+    if (selectedHistoryTab === 'unpaid' && (o.paymentStatus === 'paid' || isPaymentConfirmedByOrderStatus(o.orderStatus))) return false;
     if (selectedHistoryTab === 'transit' && (o.orderStatus !== 'flight_transit' && o.orderStatus !== 'shipped_kr' && o.orderStatus !== 'warehouse')) return false;
     if (selectedHistoryTab === 'shipping' && (o.orderStatus !== 'domestic_shipping' && o.orderStatus !== 'taiwan_customs_sorting')) return false;
 
@@ -557,11 +557,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                           {statusBadge.label}
                         </span>
                         <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                          order.paymentStatus === 'paid' 
+                          order.paymentStatus === 'paid' || isPaymentConfirmedByOrderStatus(order.orderStatus)
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                             : 'bg-amber-50 text-amber-700 border border-amber-200'
                         }`}>
-                          {order.paymentStatus === 'paid' ? '已核帳' : '對帳中'}
+                          {order.paymentStatus === 'paid' || isPaymentConfirmedByOrderStatus(order.orderStatus) ? '已核帳' : '對帳中'}
                         </span>
                       </div>
                     </div>

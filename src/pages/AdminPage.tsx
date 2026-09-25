@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { Order, ShippingBatch, ActivePage, OrderStatus, AdminMember, UserProfile, Product, WalletTransaction } from '../types';
 import { PageHeader } from '../components/PageHeader';
-import { cleanPobDisplay, groupOrderItemsByCampaign } from '../utils/orderUtils';
+import { cleanPobDisplay, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
 import { getTaipeiDate, isProductAvailable, supabase } from '../lib/supabase';
 import { canManageArtistGroups, useArtistGroups } from '../hooks/useArtistGroups';
 
@@ -361,10 +361,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       return;
     }
     if (selectedOrderIds.length === 0) return;
-    const updates: Partial<Order> = {
-      orderStatus: batchTargetStatus,
-      paymentStatus: (batchTargetStatus === 'domestic_shipping' || batchTargetStatus === 'taiwan_customs_sorting' || batchTargetStatus === 'flight_transit') ? 'paid' : undefined
-    };
+    const updates: Partial<Order> = { orderStatus: batchTargetStatus };
+    if (isPaymentConfirmedByOrderStatus(batchTargetStatus)) updates.paymentStatus = 'paid';
 
     if (onBatchUpdateOrders) {
       onBatchUpdateOrders(selectedOrderIds, updates);
@@ -491,7 +489,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       pobPreference: cleanPobDisplay(editPobPreference),
       secondPaymentAmount: Number(editSecondPaymentAmount) || 0,
       paymentAccount: editPaymentAccount,
-      paymentStatus: (editStatus === 'taiwan_customs_sorting' || editStatus === 'domestic_shipping' || editStatus === 'completed' || editStatus === 'flight_transit') ? 'paid' : editingOrder.paymentStatus
+      paymentStatus: isPaymentConfirmedByOrderStatus(editStatus) ? 'paid' : editingOrder.paymentStatus
     };
 
     if (onUpdateOrderDetails) {
@@ -563,7 +561,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         isFirstLineForOrder ? order.totalAmount : '',
         isFirstLineForOrder ? order.secondPaymentAmount ?? 0 : '',
         isFirstLineForOrder ? order.paymentAccount || '全支付(389)11016053741860' : '',
-        isFirstLineForOrder ? order.paymentStatus === 'paid' ? '已核帳' : order.paymentStatus === 'verifying' ? '核對中' : '未付款' : '',
+        isFirstLineForOrder ? (order.paymentStatus === 'paid' || isPaymentConfirmedByOrderStatus(order.orderStatus)) ? '已核帳' : order.paymentStatus === 'verifying' ? '核對中' : '未付款' : '',
         isFirstLineForOrder ? order.bankLastFive || '' : '',
         isFirstLineForOrder ? getStatusBadge(order.orderStatus).label : '',
         isFirstLineForOrder ? order.notes || '' : ''

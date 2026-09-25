@@ -1,5 +1,21 @@
 import { Order, OrderItem } from '../types';
 
+const PAYMENT_CONFIRMED_STATUSES = new Set<Order['orderStatus']>([
+  'procuring', 'ordered', 'shipped_kr', 'warehouse', 'flight_transit',
+  'taiwan_customs_sorting', 'domestic_shipping', 'completed', 'confirmed',
+  'purchased_official', 'international_transit', 'domestic_sorting', 'shipped',
+]);
+
+export function isPaymentConfirmedByOrderStatus(status: Order['orderStatus']): boolean {
+  return PAYMENT_CONFIRMED_STATUSES.has(status);
+}
+
+export function normalizeOrderPaymentStatus(order: Order): Order {
+  return isPaymentConfirmedByOrderStatus(order.orderStatus) && order.paymentStatus !== 'paid'
+    ? { ...order, paymentStatus: 'paid' }
+    : order;
+}
+
 export interface OrderItemCampaignGroup {
   artist: string;
   campaign: string;

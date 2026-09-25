@@ -22,6 +22,7 @@ import { AddProductPage } from './pages/AddProductPage';
 import { LoginPage } from './pages/LoginPage';
 import { ContactPage } from './pages/ContactPage';
 import { supabase, ADMIN_EMAILS, isProductAvailable } from './lib/supabase';
+import { isPaymentConfirmedByOrderStatus, normalizeOrderPaymentStatus } from './utils/orderUtils';
 
 export default function App() {
   // Navigation State
@@ -175,10 +176,18 @@ export default function App() {
     const isAdmin = ADMIN_EMAILS.includes(email);
 
     const mapOrderRows = (rows: { data: Order; cancellation_status: Order['cancellationStatus'] }[]) =>
-      rows.map(row => ({ ...row.data, cancellationStatus: row.cancellation_status || row.data.cancellationStatus || 'none' }));
+      rows.map(row => normalizeOrderPaymentStatus({ ...row.data, cancellationStatus: row.cancellation_status || row.data.cancellationStatus || 'none' }));
     const loadCloudOrders = async () => {
       const { data, error } = await supabase.from('orders').select('data,cancellation_status').order('created_at', { ascending: false });
-      if (!error && data && active) setOrders(mapOrderRows(data as { data: Order; cancellation_status: Order['cancellationStatus'] }[]));
+      if (!error && data && active) {
+        const rows = data as { data: Order; cancellation_status: Order['cancellationStatus'] }[];
+        const cloudOrders = mapOrderRows(rows);
+        setOrders(cloudOrders);
+        const inconsistentOrders = cloudOrders.filter((order, index) => order.paymentStatus !== rows[index].data.paymentStatus);
+        if (inconsistentOrders.length) {
+          void Promise.all(inconsistentOrders.map(order => supabase.from('orders').update({ data: order, updated_at: new Date().toISOString() }).eq('id', order.id)));
+        }
+      }
     };
     const loadWallet = async () => {
       const { data, error } = await supabase.from('wallet_transactions').select('id,owner_email,order_id,amount,transaction_type,description,created_at').order('created_at', { ascending: false });
@@ -340,7 +349,7 @@ export default function App() {
             ...o,
             orderStatus: status,
             trackingNumber: trackingNumber || o.trackingNumber,
-            paymentStatus: status === 'confirmed' || status === 'shipped' || status === 'completed' || status === 'domestic_shipping' ? 'paid' : o.paymentStatus
+            paymentStatus: isPaymentConfirmedByOrderStatus(status) ? 'paid' : o.paymentStatus
           };
         }
         return o;
@@ -352,7 +361,7 @@ export default function App() {
         ...order,
         orderStatus: status,
         trackingNumber: trackingNumber || order.trackingNumber,
-        paymentStatus: status === 'confirmed' || status === 'shipped' || status === 'completed' || status === 'domestic_shipping' ? 'paid' : order.paymentStatus,
+        paymentStatus: isPaymentConfirmedByOrderStatus(status) ? 'paid' : order.paymentStatus,
       };
       void supabase.from('orders').update({ data: updated, updated_at: new Date().toISOString() }).eq('id', orderId);
     }
@@ -361,7 +370,7 @@ export default function App() {
   const handleUpdateOrderDetails = (orderId: string, updates: Partial<Order>) => {
     const existing = orders.find(order => order.id === orderId);
     if (!existing) return;
-    const updated = { ...existing, ...updates };
+    const updated = normalizeOrderPaymentStatus({ ...existing, ...updates });
     setOrders(prev => prev.map(order => order.id === orderId ? updated : order));
     void supabase.from('orders').update({
       data: updated,
@@ -419,11 +428,11 @@ export default function App() {
   // Batch Multi-Order Update
   const handleBatchUpdateOrders = (orderIds: string[], updates: Partial<Order>) => {
     setOrders(prev =>
-      prev.map(o => (orderIds.includes(o.id) ? { ...o, ...updates } : o))
+      prev.map(o => orderIds.includes(o.id) ? normalizeOrderPaymentStatus({ ...o, ...updates }) : o)
     );
     const affected = orders.filter(order => orderIds.includes(order.id));
     void Promise.all(affected.map(order => supabase.from('orders').update({
-      data: { ...order, ...updates },
+      data: normalizeOrderPaymentStatus({ ...order, ...updates }),
       cancellation_status: updates.cancellationStatus || order.cancellationStatus || 'none',
       updated_at: new Date().toISOString(),
     }).eq('id', order.id)));
@@ -485,7 +494,7 @@ export default function App() {
           return {
             ...o,
             orderStatus: newStatus,
-            paymentStatus: (newStatus === 'domestic_shipping' || newStatus === 'taiwan_customs_sorting' || newStatus === 'flight_transit') ? 'paid' : o.paymentStatus
+            paymentStatus: isPaymentConfirmedByOrderStatus(newStatus) ? 'paid' : o.paymentStatus
           };
         }
         return o;
@@ -496,7 +505,7 @@ export default function App() {
       data: {
         ...order,
         orderStatus: newStatus,
-        paymentStatus: (newStatus === 'domestic_shipping' || newStatus === 'taiwan_customs_sorting' || newStatus === 'flight_transit') ? 'paid' : order.paymentStatus,
+        paymentStatus: isPaymentConfirmedByOrderStatus(newStatus) ? 'paid' : order.paymentStatus,
       },
       updated_at: new Date().toISOString(),
     }).eq('id', order.id)));
