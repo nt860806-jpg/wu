@@ -55,6 +55,7 @@ interface AdminPageProps {
   onEditProduct: (product: Product) => void;
   onArchiveProduct: (productId: string) => void;
   onReopenProduct: (productId: string) => void;
+  onDeleteOfflineProduct: (productId: string) => void;
   currentUser?: UserProfile;
   onSwitchUserRole?: () => void;
 }
@@ -95,6 +96,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onEditProduct,
   onArchiveProduct,
   onReopenProduct,
+  onDeleteOfflineProduct,
   currentUser,
   onSwitchUserRole,
 }) => {
@@ -889,7 +891,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       {productView === 'available' ? (
                         <button type="button" onClick={() => { if (window.confirm(`確定將「${product.title}」移至已下架清單？之後仍可重新上架。`)) onArchiveProduct(product.id); }} className="px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />移至下架</button>
                       ) : (
-                        <button type="button" onClick={() => onReopenProduct(product.id)} className="px-2.5 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-50 inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" />重新上架</button>
+                        <>
+                          <button type="button" onClick={() => onReopenProduct(product.id)} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" />重新上架</button>
+                          <button type="button" onClick={() => { if (window.confirm(`確定永久刪除「${product.title}」？此操作無法復原。`)) onDeleteOfflineProduct(product.id); }} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />永久刪除</button>
+                        </>
                       )}
                     </div>
                   </div>

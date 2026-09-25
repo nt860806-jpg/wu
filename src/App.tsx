@@ -21,7 +21,7 @@ import { AdminPage } from './pages/AdminPage';
 import { AddProductPage } from './pages/AddProductPage';
 import { LoginPage } from './pages/LoginPage';
 import { ContactPage } from './pages/ContactPage';
-import { supabase, ADMIN_EMAILS } from './lib/supabase';
+import { supabase, ADMIN_EMAILS, isProductAvailable } from './lib/supabase';
 
 export default function App() {
   // Navigation State
@@ -504,6 +504,15 @@ export default function App() {
     setProducts(prev => prev.map(item => item.id === productId ? reopened : item));
   };
 
+  const handleDeleteOfflineProduct = async (productId: string) => {
+    if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase())) return;
+    const product = products.find(item => item.id === productId);
+    if (!product || isProductAvailable(product)) return;
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (error) { window.alert('刪除失敗，請稍後重試。'); return; }
+    setProducts(prev => prev.filter(item => item.id !== productId));
+  };
+
   // Dynamic share metadata based on current page
   const getShareInfo = () => {
     switch (currentPage) {
@@ -633,6 +642,7 @@ export default function App() {
             onEditProduct={(product) => { setProductToEdit(product); handleNavigate('add-product'); }}
             onArchiveProduct={handleArchiveProduct}
             onReopenProduct={handleReopenProduct}
+            onDeleteOfflineProduct={handleDeleteOfflineProduct}
             currentUser={currentUser}
             onSwitchUserRole={handleSwitchUserRole}
           />
