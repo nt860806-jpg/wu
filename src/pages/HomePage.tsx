@@ -15,6 +15,16 @@ import { PageHeader } from '../components/PageHeader';
 import { isProductAvailable } from '../lib/supabase';
 import { useArtistGroups } from '../hooks/useArtistGroups';
 
+interface ProductListing {
+  key: string;
+  products: Product[];
+  representative: Product;
+}
+
+const getListingImages = (products: Product[]) => Array.from(new Set(
+  products.flatMap(product => product.gallery?.length ? product.gallery : [product.imageUrl]).filter(Boolean)
+));
+
 interface HomePageProps {
   products: Product[];
   onNavigate: (page: ActivePage) => void;
@@ -32,6 +42,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const { activeGroups } = useArtistGroups();
   const [selectedArtistTab, setSelectedArtistTab] = useState<Artist>('ALL');
+  const [listingImageIndices, setListingImageIndices] = useState<Record<string, number>>({});
   
   // 專屬藝人專區：可以修改團體 (Requirement 8)
   const [myFavoriteArtists, setMyFavoriteArtists] = useState<string[]>(() => {
@@ -71,6 +82,15 @@ export const HomePage: React.FC<HomePageProps> = ({
   const filteredProducts = selectedArtistTab === 'ALL' 
     ? activeProducts 
     : activeProducts.filter(p => p.artist === selectedArtistTab);
+  const filteredListings: ProductListing[] = Array.from(
+    filteredProducts.reduce((groups, product) => {
+      const key = product.listingGroupId || product.id;
+      const listing = groups.get(key) || { key, products: [], representative: product };
+      listing.products.push(product);
+      groups.set(key, listing);
+      return groups;
+    }, new Map<string, ProductListing>()).values()
+  );
 
   const selectedFavoriteArtists = myFavoriteArtists.filter(name => activeGroups.some(group => group.name === name));
   const visibleFavoriteArtists = selectedFavoriteArtists.length ? selectedFavoriteArtists : activeGroups.slice(0, 1).map(group => group.name);
@@ -281,19 +301,27 @@ export const HomePage: React.FC<HomePageProps> = ({
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {filteredProducts.slice(0, 8).map(product => {
-              const progressPct = Math.min(100, Math.round((product.currentUnits / product.targetUnits) * 100));
+                {filteredListings.slice(0, 8).map(listing => {
+              const product = listing.representative;
+              const progressUnits = listing.products.reduce((sum, item) => sum + item.currentUnits, 0);
+              const targetUnits = listing.products.reduce((sum, item) => sum + item.targetUnits, 0);
+              const progressPct = Math.min(100, Math.round((progressUnits / Math.max(targetUnits, 1)) * 100));
+              const listingImages = getListingImages(listing.products);
+              const listingImageIndex = Math.min(listingImageIndices[listing.key] || 0, listingImages.length - 1);
+              const prices = listing.products.map(item => item.price);
+              const minPrice = Math.min(...prices);
+              const maxPrice = Math.max(...prices);
               return (
                 <div
-                  key={product.id}
+                  key={listing.key}
                   className="group bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col justify-between"
                 >
                   <div>
                     {/* Image & Badges */}
                     <div className="relative aspect-square w-full overflow-hidden bg-slate-100">
                       <img
-                        src={product.imageUrl}
-                        alt={product.title}
+                        src={listingImages[listingImageIndex] || product.imageUrl}
+                        alt={product.listingGroupId ? product.campaign || product.title : product.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         referrerPolicy="no-referrer"
                       />
@@ -306,16 +334,38 @@ export const HomePage: React.FC<HomePageProps> = ({
                             即將結單
                           </span>
                         )}
+                        {product.campaign && (
+                          <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-rose-600 text-white shadow-xs">
+                            {product.campaign}
+                          </span>
+                        )}
                       </div>
                       <div className="absolute bottom-2.5 right-2.5 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-medium px-2 py-0.5 rounded-md">
                         {product.category}
                       </div>
                     </div>
 
+                    {listingImages.length > 1 && (
+                      <div className="flex gap-1.5 overflow-x-auto px-3 pt-3" aria-label="本主題批號商品圖片">
+                        {listingImages.map((image, imageIndex) => (
+                          <button
+                            key={`${image}-${imageIndex}`}
+                            type="button"
+                            onClick={() => setListingImageIndices(current => ({ ...current, [listing.key]: imageIndex }))}
+                            aria-label={`顯示第 ${imageIndex + 1} 張商品圖片`}
+                            aria-pressed={listingImageIndex === imageIndex}
+                            className={`h-12 w-12 shrink-0 overflow-hidden rounded-lg border-2 ${listingImageIndex === imageIndex ? 'border-rose-500' : 'border-slate-200'}`}
+                          >
+                            <img src={image} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Content */}
                     <div className="p-4 space-y-2.5">
                       <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-rose-600 transition-colors">
-                        {product.title}
+                        {product.listingGroupId ? product.campaign || product.title : product.title}
                       </h3>
 
                       {/* POB Feature */}
@@ -326,7 +376,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                       {/* Progress Bar */}
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                          <span>已集單 {product.currentUnits} 件</span>
+                          <span>已集單 {progressUnits}/{targetUnits} 件</span>
                           <span className="font-bold text-rose-600">{progressPct}%</span>
                         </div>
                         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -343,12 +393,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <div className="p-4 pt-2 border-t border-slate-100 space-y-3">
                     <div className="flex items-baseline justify-between">
                       <div>
-                        <span className="text-xs text-slate-400 font-mono line-through mr-1.5">
-                          NT$ {product.originalPrice}
-                        </span>
                         <span className="text-base font-extrabold text-slate-900 font-mono">
-                          NT$ {product.price.toLocaleString()}
+                          {minPrice === maxPrice ? `NT$ ${minPrice.toLocaleString()}` : `NT$ ${minPrice.toLocaleString()} 起`}
                         </span>
+                        {listing.products.length > 1 && <span className="text-[10px] text-slate-400">最高 NT$ {maxPrice.toLocaleString()}</span>}
                       </div>
                     </div>
 
@@ -372,7 +420,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   onClick={() => onNavigate('products')}
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-slate-300 hover:border-slate-400 bg-white text-slate-800 text-xs sm:text-sm font-semibold shadow-xs transition-colors"
                 >
-                  <span>查看全部 JYP 藝人周邊目錄 (共 {products.length} 款)</span>
+                  <span>查看全部 JYP 藝人周邊目錄 (共 {filteredListings.length} 團)</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
