@@ -17,7 +17,7 @@ import {
 import { Order, OrderStatus } from '../types';
 import { PageHeader } from '../components/PageHeader';
 import { BRAND_CONFIG } from '../data/mockData';
-import { cleanPobDisplay, groupOrderItemsByCampaign } from '../utils/orderUtils';
+import { cleanPobDisplay, getOrderCampaignStatus, groupOrderItemsByCampaign } from '../utils/orderUtils';
 
 interface OrderStatusPageProps {
   orders: Order[];
@@ -73,6 +73,8 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
     setCopiedOrderId(true);
     setTimeout(() => setCopiedOrderId(false), 2000);
   };
+
+  const searchedOrderGroups = searchedOrder ? groupOrderItemsByCampaign(searchedOrder.items, searchedOrder.campaign) : [];
 
   // Helper for order status badge
   const getStatusBadge = (status: OrderStatus) => {
@@ -232,17 +234,15 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
                 </p>
               </div>
 
-              {/* Status Pill */}
-              <div>
-                {(() => {
-                  const badge = getStatusBadge(searchedOrder.orderStatus);
-                  return (
-                    <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border ${badge.color}`}>
-                      <span className="w-2 h-2 rounded-full bg-current" />
-                      {badge.text}
-                    </span>
-                  );
-                })()}
+              {/* Each theme in a combined order has its own status */}
+              <div className="flex flex-wrap justify-end gap-2">
+                {searchedOrderGroups.map(group => {
+                  const badge = getStatusBadge(getOrderCampaignStatus(searchedOrder, group.artist, group.campaign));
+                  return <span key={`${group.artist}-${group.campaign}`} className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border ${badge.color}`}>
+                    <span className="w-2 h-2 rounded-full bg-current" />
+                    {group.artist}・{group.campaign}：{badge.text}
+                  </span>;
+                })}
               </div>
             </div>
 
@@ -256,47 +256,34 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
               </div>
             ) : <>
             {/* Stepper Timeline */}
-            <div className="p-6 sm:p-8 overflow-x-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  團務九階段即時流轉時程
-                </h4>
-                <span className="text-[11px] text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full font-medium">
-                  可橫向滑動查看全部 9 階段
-                </span>
-              </div>
-              <div className="min-w-[780px] flex items-center justify-between relative py-2">
-                {/* Connecting Line */}
-                <div className="absolute top-7 left-8 right-8 h-0.5 bg-slate-200 -z-0" />
-                
-                {stepsList.map((st, idx) => {
-                  const currentActiveIdx = getStepActiveIndex(searchedOrder.orderStatus);
-                  const isDone = idx < currentActiveIdx;
-                  const isCurrent = idx === currentActiveIdx;
-
-                  return (
-                    <div key={st.key} className="relative z-10 flex flex-col items-center text-center max-w-[84px]">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
-                        isDone
-                          ? 'bg-rose-600 text-white shadow-xs'
-                          : isCurrent
-                          ? 'bg-rose-500 text-white ring-4 ring-rose-100 font-black'
-                          : 'bg-white border-2 border-slate-300 text-slate-400'
-                      }`}>
-                        {isDone ? <Check className="w-4 h-4" /> : idx + 1}
-                      </div>
-                      <span className={`text-[11px] font-bold mt-2 ${
-                        isCurrent ? 'text-rose-600 font-extrabold' : isDone ? 'text-slate-900' : 'text-slate-400'
-                      }`}>
-                        {st.label}
-                      </span>
-                      <span className="text-[10px] text-slate-400 leading-tight mt-0.5">
-                        {st.desc}
-                      </span>
+            <div className="p-6 sm:p-8 space-y-6">
+              {searchedOrderGroups.map(group => {
+                const campaignStatus = getOrderCampaignStatus(searchedOrder, group.artist, group.campaign);
+                const currentActiveIdx = getStepActiveIndex(campaignStatus);
+                const badge = getStatusBadge(campaignStatus);
+                return <section key={`${group.artist}-${group.campaign}`} className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-slate-700">{group.artist}・{group.campaign} 團務進度</h4>
+                    <span className={`px-2.5 py-1 rounded-full border text-[11px] font-semibold ${badge.color}`}>{badge.text}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[780px] flex items-center justify-between relative py-2">
+                      <div className="absolute top-7 left-8 right-8 h-0.5 bg-slate-200 -z-0" />
+                      {stepsList.map((st, idx) => {
+                        const isDone = idx < currentActiveIdx;
+                        const isCurrent = idx === currentActiveIdx;
+                        return <div key={st.key} className="relative z-10 flex flex-col items-center text-center max-w-[84px]">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${isDone ? 'bg-rose-600 text-white shadow-xs' : isCurrent ? 'bg-rose-500 text-white ring-4 ring-rose-100 font-black' : 'bg-white border-2 border-slate-300 text-slate-400'}`}>
+                            {isDone ? <Check className="w-4 h-4" /> : idx + 1}
+                          </div>
+                          <span className={`text-[11px] font-bold mt-2 ${isCurrent ? 'text-rose-600 font-extrabold' : isDone ? 'text-slate-900' : 'text-slate-400'}`}>{st.label}</span>
+                          <span className="text-[10px] text-slate-400 leading-tight mt-0.5">{st.desc}</span>
+                        </div>;
+                      })}
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                </section>;
+              })}
             </div>
 
             {/* Bank Last Five Verification Box (if pending or verifying) */}
@@ -347,10 +334,13 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
                 本筆訂單明細 (共 {searchedOrder.items.length} 項)
               </h4>
               <div className="space-y-4">
-                {groupOrderItemsByCampaign(searchedOrder.items, searchedOrder.campaign).map(group => (
+                {searchedOrderGroups.map(group => {
+                  const badge = getStatusBadge(getOrderCampaignStatus(searchedOrder, group.artist, group.campaign));
+                  return (
                   <section key={`${group.artist}-${group.campaign}`} className="rounded-xl border border-slate-200 overflow-hidden">
-                    <h5 className="px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700">
-                      {group.artist}・{group.campaign}
+                    <h5 className="px-3 py-2 bg-slate-50 text-xs font-bold text-slate-700 flex flex-wrap items-center justify-between gap-2">
+                      <span>{group.artist}・{group.campaign}</span>
+                      <span className={`px-2 py-0.5 rounded-full border text-[10px] ${badge.color}`}>{badge.text}</span>
                     </h5>
                     <div className="divide-y divide-slate-100 px-3">
                       {group.items.map((item, idx) => (
@@ -393,7 +383,7 @@ export const OrderStatusPage: React.FC<OrderStatusPageProps> = ({
                       ))}
                     </div>
                   </section>
-                ))}
+                );})}
               </div>
             </div>
 

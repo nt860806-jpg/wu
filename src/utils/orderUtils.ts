@@ -16,6 +16,35 @@ export function normalizeOrderPaymentStatus(order: Order): Order {
     : order;
 }
 
+export function getCampaignStatusKey(artist: string, campaign: string): string {
+  return `${artist.trim().toLowerCase()}::${campaign.trim().toLowerCase()}`;
+}
+
+export function getOrderCampaignStatus(order: Order, artist: string, campaign: string): Order['orderStatus'] {
+  return order.campaignStatuses?.[getCampaignStatusKey(artist, campaign)] || order.orderStatus;
+}
+
+export function withAllCampaignStatuses(order: Order, status: Order['orderStatus']): Order {
+  const campaignStatuses = { ...order.campaignStatuses };
+  for (const group of groupOrderItemsByCampaign(order.items, order.campaign)) {
+    campaignStatuses[getCampaignStatusKey(group.artist, group.campaign)] = status;
+  }
+  return { ...order, orderStatus: status, campaignStatuses };
+}
+
+export function withCampaignStatus(order: Order, artist: string, campaign: string, status: Order['orderStatus']): Order {
+  const groups = groupOrderItemsByCampaign(order.items, order.campaign);
+  const campaignStatuses = { ...order.campaignStatuses };
+  for (const group of groups) {
+    const key = getCampaignStatusKey(group.artist, group.campaign);
+    campaignStatuses[key] = campaignStatuses[key] || order.orderStatus;
+  }
+  campaignStatuses[getCampaignStatusKey(artist, campaign)] = status;
+  const groupStatuses = groups.map(group => campaignStatuses[getCampaignStatusKey(group.artist, group.campaign)]);
+  const sharedStatus = groupStatuses.length && groupStatuses.every(value => value === groupStatuses[0]) ? groupStatuses[0] : order.orderStatus;
+  return { ...order, orderStatus: sharedStatus, campaignStatuses };
+}
+
 export interface OrderItemCampaignGroup {
   artist: string;
   campaign: string;

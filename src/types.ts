@@ -122,6 +122,8 @@ export interface Order {
   storeCode?: string;
   address?: string;
   orderStatus: OrderStatus;
+  /** Separate progress per artist/theme when one checkout contains multiple group-buys. */
+  campaignStatuses?: Record<string, OrderStatus>;
   trackingNumber?: string;
   batchCode: string;
   notes?: string;

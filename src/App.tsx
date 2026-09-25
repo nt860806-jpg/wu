@@ -22,7 +22,7 @@ import { AddProductPage } from './pages/AddProductPage';
 import { LoginPage } from './pages/LoginPage';
 import { ContactPage } from './pages/ContactPage';
 import { supabase, ADMIN_EMAILS, isProductAvailable } from './lib/supabase';
-import { isPaymentConfirmedByOrderStatus, normalizeOrderPaymentStatus } from './utils/orderUtils';
+import { groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus, normalizeOrderPaymentStatus, withAllCampaignStatuses, withCampaignStatus } from './utils/orderUtils';
 
 export default function App() {
   // Navigation State
@@ -345,10 +345,12 @@ export default function App() {
     setOrders(prev =>
       prev.map(o => {
         if (o.id === orderId) {
-          return {
+          const updatedOrder = withAllCampaignStatuses({
             ...o,
-            orderStatus: status,
             trackingNumber: trackingNumber || o.trackingNumber,
+          }, status);
+          return {
+            ...updatedOrder,
             paymentStatus: isPaymentConfirmedByOrderStatus(status) ? 'paid' : o.paymentStatus
           };
         }
@@ -357,10 +359,9 @@ export default function App() {
     );
     const order = orders.find(item => item.id === orderId);
     if (order) {
+      const statusUpdatedOrder = withAllCampaignStatuses({ ...order, trackingNumber: trackingNumber || order.trackingNumber }, status);
       const updated = {
-        ...order,
-        orderStatus: status,
-        trackingNumber: trackingNumber || order.trackingNumber,
+        ...statusUpdatedOrder,
         paymentStatus: isPaymentConfirmedByOrderStatus(status) ? 'paid' : order.paymentStatus,
       };
       void supabase.from('orders').update({ data: updated, updated_at: new Date().toISOString() }).eq('id', orderId);
@@ -370,7 +371,9 @@ export default function App() {
   const handleUpdateOrderDetails = (orderId: string, updates: Partial<Order>) => {
     const existing = orders.find(order => order.id === orderId);
     if (!existing) return;
-    const updated = normalizeOrderPaymentStatus({ ...existing, ...updates });
+    const updated = normalizeOrderPaymentStatus(updates.orderStatus
+      ? withAllCampaignStatuses({ ...existing, ...updates }, updates.orderStatus)
+      : { ...existing, ...updates });
     setOrders(prev => prev.map(order => order.id === orderId ? updated : order));
     void supabase.from('orders').update({
       data: updated,
@@ -428,11 +431,17 @@ export default function App() {
   // Batch Multi-Order Update
   const handleBatchUpdateOrders = (orderIds: string[], updates: Partial<Order>) => {
     setOrders(prev =>
-      prev.map(o => orderIds.includes(o.id) ? normalizeOrderPaymentStatus({ ...o, ...updates }) : o)
+      prev.map(o => {
+        if (!orderIds.includes(o.id)) return o;
+        const combined = { ...o, ...updates };
+        return normalizeOrderPaymentStatus(updates.orderStatus ? withAllCampaignStatuses(combined, updates.orderStatus) : combined);
+      })
     );
     const affected = orders.filter(order => orderIds.includes(order.id));
     void Promise.all(affected.map(order => supabase.from('orders').update({
-      data: normalizeOrderPaymentStatus({ ...order, ...updates }),
+      data: normalizeOrderPaymentStatus(updates.orderStatus
+        ? withAllCampaignStatuses({ ...order, ...updates }, updates.orderStatus)
+        : { ...order, ...updates }),
       cancellation_status: updates.cancellationStatus || order.cancellationStatus || 'none',
       updated_at: new Date().toISOString(),
     }).eq('id', order.id)));
@@ -463,6 +472,24 @@ export default function App() {
         || (order.campaign === targetBatch.campaign && (targetBatch.artist === 'ALL' || order.items.some(item => item.artist === targetBatch.artist)))
         || (!order.items.length && order.campaign === targetBatch.campaign)
       : order.batchCode === targetBatch.batchCode;
+    const updateOrderForBatch = (order: Order): Order => {
+      if (!belongsToBatch(order) || order.orderStatus === 'cancelled') return order;
+      const groups = groupOrderItemsByCampaign(order.items, order.campaign);
+      let updated = order;
+      if (targetBatch.campaign) {
+        const matchingGroups = groups.filter(group => group.campaign === targetBatch.campaign && (targetBatch.artist === 'ALL' || group.artist === targetBatch.artist));
+        matchingGroups.forEach(group => {
+          updated = withCampaignStatus(updated, group.artist, group.campaign, newStatus);
+        });
+      } else {
+        updated = withAllCampaignStatuses(order, newStatus);
+      }
+      if (!groups.length) updated = { ...updated, orderStatus: newStatus };
+      return normalizeOrderPaymentStatus({
+        ...updated,
+        paymentStatus: isPaymentConfirmedByOrderStatus(newStatus) ? 'paid' : updated.paymentStatus,
+      });
+    };
 
     const statusText = getStatusTextFromCode(newStatus);
     const newEvent = {
@@ -490,25 +517,11 @@ export default function App() {
     // 2. Synchronize all orders belonging to this batch
     setOrders(prev =>
       prev.map(o => {
-        if (belongsToBatch(o) && o.orderStatus !== 'cancelled') {
-          return {
-            ...o,
-            orderStatus: newStatus,
-            paymentStatus: isPaymentConfirmedByOrderStatus(newStatus) ? 'paid' : o.paymentStatus
-          };
-        }
-        return o;
+        return updateOrderForBatch(o);
       })
     );
     const batchOrders = orders.filter(order => belongsToBatch(order) && order.orderStatus !== 'cancelled');
-    void Promise.all(batchOrders.map(order => supabase.from('orders').update({
-      data: {
-        ...order,
-        orderStatus: newStatus,
-        paymentStatus: isPaymentConfirmedByOrderStatus(newStatus) ? 'paid' : order.paymentStatus,
-      },
-      updated_at: new Date().toISOString(),
-    }).eq('id', order.id)));
+    void Promise.all(batchOrders.map(order => supabase.from('orders').update({ data: updateOrderForBatch(order), updated_at: new Date().toISOString() }).eq('id', order.id)));
   };
 
   const handleAdvanceBatchStatus = (batchId: string) => {

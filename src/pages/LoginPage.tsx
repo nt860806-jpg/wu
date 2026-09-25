@@ -20,7 +20,7 @@ import { UserProfile, ActivePage, Order, OrderStatus, WalletTransaction } from '
 import { MOCK_USERS } from '../data/mockData';
 import { PageHeader } from '../components/PageHeader';
 import { supabase } from '../lib/supabase';
-import { groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
+import { getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
 
 interface LoginPageProps {
   currentUser: UserProfile;
@@ -527,7 +527,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           ) : (
             <div className="space-y-4">
               {filteredHistoryOrders.map(order => {
-                const statusBadge = getOrderStatusBadge(order.orderStatus);
+                const orderCampaignGroups = groupOrderItemsByCampaign(order.items, order.campaign);
                 return (
                   <div
                     key={order.id}
@@ -553,9 +553,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${statusBadge.badgeColor}`}>
-                          {statusBadge.label}
-                        </span>
+                        {orderCampaignGroups.map(group => {
+                          const statusBadge = getOrderStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign));
+                          return <span key={`${group.artist}-${group.campaign}`} className={`text-xs font-bold px-2.5 py-1 rounded-full border ${statusBadge.badgeColor}`}>
+                            {group.artist}・{group.campaign}：{statusBadge.label}
+                          </span>;
+                        })}
                         <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
                           order.paymentStatus === 'paid' || isPaymentConfirmedByOrderStatus(order.orderStatus)
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
@@ -568,10 +571,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
                     {/* Order Items */}
                     <div className="space-y-3">
-                      {groupOrderItemsByCampaign(order.items, order.campaign).map(group => (
+                      {orderCampaignGroups.map(group => {
+                        const statusBadge = getOrderStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign));
+                        return (
                         <section key={`${group.artist}-${group.campaign}`} className="rounded-xl border border-slate-200 overflow-hidden">
-                          <h4 className="px-3 py-2 bg-slate-50 text-[11px] font-bold text-slate-700">
-                            {group.artist}・{group.campaign}
+                          <h4 className="px-3 py-2 bg-slate-50 text-[11px] font-bold text-slate-700 flex flex-wrap items-center justify-between gap-2">
+                            <span>{group.artist}・{group.campaign}</span>
+                            <span className={`px-2 py-0.5 rounded-full border ${statusBadge.badgeColor}`}>{statusBadge.label}</span>
                           </h4>
                           <div className="space-y-2 p-3">
                             {group.items.map((item, idx) => (
@@ -597,7 +603,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                             ))}
                           </div>
                         </section>
-                      ))}
+                      );})}
                     </div>
 
                     {order.cancellationStatus && order.cancellationStatus !== 'none' && (
