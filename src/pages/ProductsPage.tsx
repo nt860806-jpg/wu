@@ -421,19 +421,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                           {product.listingGroupId ? product.campaign || product.title : product.title}
                         </h3>
 
-                        {listing.products.length > 1 && (
-                          <div className="space-y-1 rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-                            <div className="text-[10px] font-bold text-slate-600">本團可選 {listing.products.length} 款商品</div>
-                            {listing.products.slice(0, 3).map(item => (
-                              <div key={item.id} className="flex items-center justify-between gap-2 text-[10px] text-slate-600">
-                                <span className="truncate">{item.title}</span>
-                                <span className="shrink-0 font-mono">NT$ {item.price.toLocaleString()}</span>
-                              </div>
-                            ))}
-                            {listing.products.length > 3 && <div className="text-[10px] text-slate-400">另有 {listing.products.length - 3} 款商品</div>}
-                          </div>
-                        )}
-
                         {/* Special POB Benefit Tag */}
                         <div className="p-2 rounded-xl bg-rose-50/70 border border-rose-100 text-[11px] text-rose-900 leading-tight">
                           <strong>🎁 官方特典：</strong>{product.pobDetail}
