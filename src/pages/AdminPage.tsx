@@ -923,57 +923,46 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                         <p className="text-[10px] text-slate-500 mt-0.5">下架日期：{unpublishDates.length === 1 ? unpublishDates[0] : '依商品設定'}</p>
                       </div>
                     </div>
-                    <details className="border-t border-slate-100 pt-2">
-                      <summary className="cursor-pointer select-none text-xs font-semibold text-rose-700 hover:text-rose-800">管理此團商品（{group.products.length}）</summary>
-                      <div className="space-y-3 pt-3">
-                        {group.products.map(product => (
-                          <div key={product.id} className="rounded-xl bg-slate-50 p-3">
-                            <h4 className="font-semibold text-xs text-slate-900">{product.title}</h4>
-                            <p className="text-[11px] text-slate-500 mt-1">NT$ {product.price.toLocaleString()}・下架日期：{product.unpublishAt || '未設定'}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
                     <div className="flex justify-end border-t border-slate-100 pt-3">
                       <button
                         type="button"
                         onClick={() => onEditProductGroup(group.products)}
                         disabled={!isAdmin}
                         className="mr-auto px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50 inline-flex items-center gap-1"
-                      ><Edit className="w-3.5 h-3.5" />編輯整團</button>
+                      ><Edit className="w-3.5 h-3.5" />編輯團務</button>
                       {productView === 'available' ? (
                         <button
                           type="button"
                           onClick={() => {
-                            if (window.confirm(`確定將「${representative.campaign || representative.title}」整團 ${group.products.length} 項商品移至已下架清單？之後可整團重新上架。`)) {
+                            if (window.confirm(`確定將「${representative.campaign || representative.title}」團務的 ${group.products.length} 項商品移至已下架清單？之後可重新上架。`)) {
                               onArchiveProducts(group.products.map(product => product.id));
                             }
                           }}
                           disabled={!isAdmin}
                           className="px-3 py-2 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"
-                        ><Trash2 className="w-3.5 h-3.5" />整團移至下架</button>
+                        ><Trash2 className="w-3.5 h-3.5" />下架團務</button>
                       ) : (
                         <div className="flex flex-wrap justify-end gap-2">
                           <button
                             type="button"
                             onClick={() => {
-                              if (window.confirm(`確定將「${representative.campaign || representative.title}」整團 ${group.products.length} 項商品重新上架？`)) {
+                              if (window.confirm(`確定重新上架「${representative.campaign || representative.title}」團務的 ${group.products.length} 項商品？`)) {
                                 onReopenProducts(group.products.map(product => product.id));
                               }
                             }}
                             disabled={!isAdmin}
                             className="px-3 py-2 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1"
-                          ><RefreshCw className="w-3.5 h-3.5" />整團重新上架</button>
+                          ><RefreshCw className="w-3.5 h-3.5" />重新上架團務</button>
                           <button
                             type="button"
                             onClick={() => {
-                              if (window.confirm(`確定永久刪除「${representative.campaign || representative.title}」已下架的 ${group.products.length} 項商品？此操作無法復原。`)) {
+                              if (window.confirm(`確定永久刪除「${representative.campaign || representative.title}」團務的 ${group.products.length} 項已下架商品？此操作無法復原。`)) {
                                 onDeleteOfflineProducts(group.products.map(product => product.id));
                               }
                             }}
                             disabled={!isAdmin}
                             className="px-3 py-2 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"
-                          ><Trash2 className="w-3.5 h-3.5" />整團刪除</button>
+                          ><Trash2 className="w-3.5 h-3.5" />刪除團務</button>
                         </div>
                       )}
                     </div>

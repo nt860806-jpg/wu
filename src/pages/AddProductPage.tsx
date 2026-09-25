@@ -413,7 +413,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       for (const [index, product] of groupUpdates.entries()) {
         const saved = await onUpdateProduct(product);
         if (!saved) {
-          setSubmitError(`整團更新至第 ${index + 1} 項時失敗；請至後台確認已更新的商品後再重試。`);
+          setSubmitError(`團務更新至第 ${index + 1} 項時失敗；請至後台確認已更新的商品後再重試。`);
           return;
         }
       }
@@ -523,11 +523,11 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     <div className="space-y-10">
       {/* 每一頁都要有頁面標題與描述 */}
       <PageHeader
-        title={editingProduct ? '編輯整團周邊介紹' : '開立全新官方周邊團務'}
+        title={editingProduct ? '編輯團務周邊介紹' : '開立全新官方周邊團務'}
         description={editingProduct
-          ? '一次更新整團共用介紹、圖片與團務設定；各商品名稱、售價和團員選項會保留。'
+          ? '一次更新團務共用介紹、圖片與設定，也可修改各商品內容。'
           : '同一團務可一次上架多款不同售價商品，個別設定是否開放選擇團員，並共用活動介紹與圖片。'}
-        tag={editingProduct ? '管理員 · 編輯整團' : '管理員 · 新增周邊'}
+        tag={editingProduct ? '管理員 · 編輯團務' : '管理員 · 新增周邊'}
         actionText="← 返回後台面板"
         onActionClick={() => onNavigate('admin')}
         onOpenShareModal={onOpenShare}
@@ -541,7 +541,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Plus className="w-5 h-5 text-rose-600" />
-                <span>{editingProduct ? '編輯整團基本資料' : '團務周邊基本資料填寫'}</span>
+                <span>{editingProduct ? '編輯團務基本資料' : '團務周邊基本資料填寫'}</span>
               </h3>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 font-medium">
@@ -562,7 +562,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
             {submittedSuccess && (
               <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2">
                 <Check className="w-4 h-4" />
-                <span>{editingProduct ? (isEditingGroup ? `整團 ${editingProducts?.length || 0} 項商品已更新！` : additionalProducts.length ? `團務商品已更新，並新增 ${additionalProducts.length} 款同團商品！` : '商品介紹已更新！') : '團務與團內商品已成功發布！'} 正在返回管理頁面...</span>
+                <span>{editingProduct ? (isEditingGroup ? `團務內 ${editingProducts?.length || 0} 項商品已更新！` : additionalProducts.length ? `團務商品已更新，並新增 ${additionalProducts.length} 款同團商品！` : '商品介紹已更新！') : '團務與團內商品已成功發布！'} 正在返回管理頁面...</span>
               </div>
             )}
 
@@ -667,7 +667,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h4 className="text-sm font-bold text-slate-900">{isEditingGroup ? '本團商品' : '本主題的商品品項'}</h4>
-                    <p className="text-[11px] text-slate-500 mt-1">{isEditingGroup ? '在同一頁編輯整團介紹及各商品內容，完成後一次儲存。' : '每列都是同一主題中的一個商品，可分別設定幣別售價與可選團員。'}</p>
+                    <p className="text-[11px] text-slate-500 mt-1">{isEditingGroup ? '在同一頁編輯團務介紹及各商品內容，完成後一次儲存。' : '每列都是同一主題中的一個商品，可分別設定幣別售價與可選團員。'}</p>
                   </div>
                   {!isEditingGroup && <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增同團商品</button>}
                 </div>
