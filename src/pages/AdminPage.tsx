@@ -899,37 +899,52 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                 <p className="col-span-full py-10 text-center text-sm text-slate-500">目前沒有這類商品。</p>
               ) : visibleProductGroups.map(group => {
                 const representative = group.products[0];
+                const prices = group.products.map(product => product.price);
+                const lowestPrice = Math.min(...prices);
+                const highestPrice = Math.max(...prices);
+                const unpublishDates = Array.from(new Set(group.products.map(product => product.unpublishAt || '未設定')));
                 return (
                   <article key={group.key} className="border border-slate-200 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 truncate">{representative.campaign || representative.title}</p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">{representative.artist}・{group.products.length} 項商品</p>
+                    <div className="flex gap-3">
+                      <img src={representative.gallery?.[0] || representative.imageUrl} alt="" className="w-20 h-20 shrink-0 rounded-xl object-cover bg-slate-100" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold text-slate-500">{representative.artist}・{representative.category}</p>
+                            <h3 className="font-bold text-sm text-slate-900 line-clamp-2 mt-0.5">{representative.campaign || representative.title}</h3>
+                          </div>
+                          <span className={`shrink-0 text-[10px] px-2 py-1 rounded-full ${productView === 'available' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{productView === 'available' ? '上架中' : '已下架／到期'}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-2 mt-1">{representative.description}</p>
+                        <p className="text-xs font-bold text-slate-800 mt-1">
+                          {lowestPrice === highestPrice ? `NT$ ${lowestPrice.toLocaleString()}` : `NT$ ${lowestPrice.toLocaleString()} 起`}
+                          {group.products.length > 1 && <span className="text-[10px] font-normal text-slate-500">・共 {group.products.length} 項商品</span>}
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">下架日期：{unpublishDates.length === 1 ? unpublishDates[0] : '依商品設定'}</p>
                       </div>
-                      <span className={`shrink-0 text-[10px] px-2 py-1 rounded-full ${productView === 'available' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{productView === 'available' ? '上架中' : '已下架／到期'}</span>
                     </div>
-                    <div className="space-y-3">
-                      {group.products.map(product => (
-                        <div key={product.id} className="flex gap-3">
-                          <img src={product.imageUrl} alt="" className="w-16 h-16 shrink-0 rounded-xl object-cover bg-slate-100" />
-                          <div className="min-w-0 flex-1">
-                            <h3 className="font-bold text-sm text-slate-900 line-clamp-2">{product.title}</h3>
-                            <p className="text-xs text-slate-500 mt-1">NT$ {product.price.toLocaleString()}・下架日期：{product.unpublishAt || '未設定'}</p>
+                    <details className="border-t border-slate-100 pt-2">
+                      <summary className="cursor-pointer select-none text-xs font-semibold text-rose-700 hover:text-rose-800">管理此團商品（{group.products.length}）</summary>
+                      <div className="space-y-3 pt-3">
+                        {group.products.map(product => (
+                          <div key={product.id} className="rounded-xl bg-slate-50 p-3">
+                            <h4 className="font-semibold text-xs text-slate-900">{product.title}</h4>
+                            <p className="text-[11px] text-slate-500 mt-1">NT$ {product.price.toLocaleString()}・下架日期：{product.unpublishAt || '未設定'}</p>
                             <div className="flex flex-wrap gap-2 mt-2">
-                              <button type="button" onClick={() => onEditProduct(product)} className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold hover:bg-slate-50 inline-flex items-center gap-1"><Edit className="w-3 h-3" />編輯</button>
+                              <button type="button" onClick={() => onEditProduct(product)} className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold hover:bg-slate-50 inline-flex items-center gap-1"><Edit className="w-3 h-3" />編輯</button>
                               {productView === 'available' ? (
-                                <button type="button" onClick={() => { if (window.confirm(`確定將「${product.title}」移至已下架清單？之後仍可重新上架。`)) onArchiveProduct(product.id); }} className="px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />移至下架</button>
+                                <button type="button" onClick={() => { if (window.confirm(`確定將「${product.title}」移至已下架清單？之後仍可重新上架。`)) onArchiveProduct(product.id); }} className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />移至下架</button>
                               ) : (
                                 <>
-                                  <button type="button" onClick={() => onReopenProduct(product.id)} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" />重新上架</button>
-                                  <button type="button" onClick={() => { if (window.confirm(`確定永久刪除「${product.title}」？此操作無法復原。`)) onDeleteOfflineProduct(product.id); }} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />永久刪除</button>
+                                  <button type="button" onClick={() => onReopenProduct(product.id)} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" />重新上架</button>
+                                  <button type="button" onClick={() => { if (window.confirm(`確定永久刪除「${product.title}」？此操作無法復原。`)) onDeleteOfflineProduct(product.id); }} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />永久刪除</button>
                                 </>
                               )}
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    </details>
                   </article>
                 );
               })}
