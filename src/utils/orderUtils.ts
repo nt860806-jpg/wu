@@ -30,6 +30,16 @@ export function isOrderAwaitingPayment(order: Order): boolean {
   return order.orderStatus === 'order_created' || order.orderStatus === 'pending_payment';
 }
 
+export function canChooseRefundForOrder(order: Order): boolean {
+  if (order.refundEligibleAtCancellation !== true) return false;
+  if (order.cancellationPreviousOrderStatus) {
+    return order.cancellationPreviousOrderStatus === 'payment_verifying' || order.cancellationPreviousOrderStatus === 'paid_verifying';
+  }
+  const previousCampaignStatuses = Object.values(order.campaignStatuses || {});
+  const allCampaignsWereUnpaid = previousCampaignStatuses.length > 0 && previousCampaignStatuses.every(status => status === 'order_created' || status === 'pending_payment');
+  return !allCampaignsWereUnpaid;
+}
+
 export function getCampaignStatusKey(artist: string, campaign: string): string {
   return `${artist.trim().toLowerCase()}::${campaign.trim().toLowerCase()}`;
 }

@@ -20,7 +20,7 @@ import { UserProfile, ActivePage, Order, OrderStatus, ShippingBatch, WalletTrans
 import { MOCK_USERS } from '../data/mockData';
 import { PageHeader } from '../components/PageHeader';
 import { supabase } from '../lib/supabase';
-import { getCampaignSecondPaymentAmount, getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
+import { canChooseRefundForOrder, getCampaignSecondPaymentAmount, getOrderCampaignStatus, groupOrderItemsByCampaign, isPaymentConfirmedByOrderStatus } from '../utils/orderUtils';
 
 interface LoginPageProps {
   currentUser: UserProfile;
@@ -619,7 +619,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                             <button type="button" disabled={resolvingOrderId === order.id} onClick={() => void handleChooseCancellation(order.id, 'store_credit')} className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold">
                               轉為購物金 NT$ {(order.subtotal || order.totalAmount).toLocaleString()}
                             </button>
-                            {order.refundEligibleAtCancellation === true && (
+                            {canChooseRefundForOrder(order) && (
                               <button type="button" disabled={resolvingOrderId === order.id} onClick={() => void handleChooseCancellation(order.id, 'refund_contact')} className="px-3 py-2 rounded-lg bg-white border border-rose-300 text-rose-800 text-xs font-bold disabled:opacity-50">
                                 自行聯繫官方帳號退款
                               </button>

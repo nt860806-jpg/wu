@@ -391,6 +391,7 @@ export default function App() {
       orderStatus: 'cancelled',
       cancellationStatus: isUnpaid ? 'cancelled_unpaid' : 'awaiting_choice',
       refundEligibleAtCancellation,
+      cancellationPreviousOrderStatus: order.orderStatus,
       cancellationReason: isUnpaid
         ? '此訂單在未付款時取消，無需退款或轉購物金。'
         : refundEligibleAtCancellation
