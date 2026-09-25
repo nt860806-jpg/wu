@@ -505,7 +505,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   // Export Clean CSV (Without removed store/tracking columns)
   const handleExportCsv = () => {
     const headers = [
-      '主題批號', '藝人團體', '品項', '規格/成員', '單價', '數量', '品項小計',
+      '主題', '藝人團體', '品項', '規格/成員', '單價', '數量', '品項小計',
       '訂單編號', '下單日期', '團次代碼', '訂購人姓名', '社群暱稱', '手機號碼', '信箱',
       '特典小卡順位', '訂單總金額', '二補金額', '指定收款帳戶', '匯款狀態', '帳號末五碼',
       '九階段物流狀態', '備註'
@@ -994,7 +994,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   {/* 第二層（分類主題/批號）：Campaign */}
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-800">
-                      主題批號 (Campaign) <span className="text-rose-500">*</span>：
+                      主題 <span className="text-rose-500">*</span>：
                     </span>
                     <select
                       value={selectedCampaign}
@@ -1004,7 +1004,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       }}
                       className="px-2.5 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-rose-500 cursor-pointer shadow-2xs"
                     >
-                      <option value="all">全部主題批號 (ALL)</option>
+                      <option value="all">全部主題</option>
                       {availableCampaigns.map(c => (
                         <option key={c} value={c}>
                           {c}
@@ -1081,7 +1081,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <ShoppingBag className="w-3.5 h-3.5 text-rose-600" />
-                      <span>本團官方採購明細統計（依 Artist &gt; Campaign 分類彙整，避免不同主題同品名混淆）：</span>
+                      <span>本團官方採購明細統計（依藝人團體與主題分類彙整，避免不同主題同品名混淆）：</span>
                     </span>
                     <span className="text-[10px] text-rose-600 font-medium">已彙整 {Object.keys(batchItemBreakdown).length} 款周邊</span>
                   </div>

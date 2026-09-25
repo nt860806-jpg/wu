@@ -526,7 +526,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-rose-900 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-rose-600" />
-                    <span>官方商品分類（Artist → Campaign）</span>
+                    <span>官方商品分類（藝人團體 → 主題）</span>
                   </span>
                   <span className="text-[10px] text-rose-600 bg-rose-100/70 px-2 py-0.5 rounded font-mono font-medium">
                     Strict Hierarchy
@@ -552,7 +552,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
 
                   <div>
                     <label className="text-xs font-bold text-slate-800 block mb-1">
-                      主題批號 (Campaign) <span className="text-rose-500">*</span>
+                      主題 <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -566,7 +566,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-[10px] text-slate-500 self-center">快速代入活動批號：</span>
+                  <span className="text-[10px] text-slate-500 self-center">快速代入開放中的主題：</span>
                   {openCampaigns.map(tag => (
                     <button
                       key={tag}
@@ -582,12 +582,12 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     </button>
                   ))}
                   {!isLoadingOpenCampaigns && openCampaigns.length === 0 && (
-                    <span className="text-[10px] text-slate-400 self-center">目前沒有開放中的活動批號</span>
+                    <span className="text-[10px] text-slate-400 self-center">目前沒有開放中的主題</span>
                   )}
-                  {isLoadingOpenCampaigns && <span className="text-[10px] text-slate-400 self-center">載入開放中的活動批號…</span>}
+                  {isLoadingOpenCampaigns && <span className="text-[10px] text-slate-400 self-center">載入開放中的主題…</span>}
                 </div>
                 <p className="text-[10px] text-slate-500 leading-tight">
-                  📌 提示：不同主題販售同名商品（如「隨機小卡」）時，系統會依主題批號分開統計庫存與價格。
+                  📌 提示：不同主題販售同名商品（如「隨機小卡」）時，系統會依主題分開統計庫存與價格。
                 </p>
               </div>
 
@@ -619,8 +619,8 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
               <section className="p-4 rounded-2xl border border-rose-200 bg-rose-50/40 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900">本主題批號的商品品項</h4>
-                    <p className="text-[11px] text-slate-500 mt-1">每列都是同一主題批號中的一個商品，可分別設定幣別售價與可選團員。</p>
+                    <h4 className="text-sm font-bold text-slate-900">本主題的商品品項</h4>
+                    <p className="text-[11px] text-slate-500 mt-1">每列都是同一主題中的一個商品，可分別設定幣別售價與可選團員。</p>
                   </div>
                   <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增同團商品</button>
                 </div>

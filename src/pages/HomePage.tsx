@@ -346,7 +346,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     </div>
 
                     {listingImages.length > 1 && (
-                      <div className="flex gap-1.5 overflow-x-auto px-3 pt-3" aria-label="本主題批號商品圖片">
+                      <div className="flex gap-1.5 overflow-x-auto px-3 pt-3" aria-label="本主題商品圖片">
                         {listingImages.map((image, imageIndex) => (
                           <button
                             key={`${image}-${imageIndex}`}
