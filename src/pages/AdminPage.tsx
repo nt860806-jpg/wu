@@ -54,8 +54,8 @@ interface AdminPageProps {
   onUpdateBatchStatus?: (batchId: string, newStatus: OrderStatus) => void;
   onOpenShare: () => void;
   onEditProduct: (product: Product) => void;
-  onArchiveProduct: (productId: string) => void;
-  onReopenProduct: (productId: string) => void;
+  onArchiveProducts: (productIds: string[]) => void;
+  onReopenProducts: (productIds: string[]) => void;
   onDeleteOfflineProduct: (productId: string) => void;
   currentUser?: UserProfile;
   onSwitchUserRole?: () => void;
@@ -96,8 +96,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onUpdateBatchStatus,
   onOpenShare,
   onEditProduct,
-  onArchiveProduct,
-  onReopenProduct,
+  onArchiveProducts,
+  onReopenProducts,
   onDeleteOfflineProduct,
   currentUser,
   onSwitchUserRole,
@@ -932,11 +932,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                             <p className="text-[11px] text-slate-500 mt-1">NT$ {product.price.toLocaleString()}・下架日期：{product.unpublishAt || '未設定'}</p>
                             <div className="flex flex-wrap gap-2 mt-2">
                               <button type="button" onClick={() => onEditProduct(product)} className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold hover:bg-slate-50 inline-flex items-center gap-1"><Edit className="w-3 h-3" />編輯</button>
-                              {productView === 'available' ? (
-                                <button type="button" onClick={() => { if (window.confirm(`確定將「${product.title}」移至已下架清單？之後仍可重新上架。`)) onArchiveProduct(product.id); }} className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />移至下架</button>
-                              ) : (
+                              {productView === 'offline' && (
                                 <>
-                                  <button type="button" onClick={() => onReopenProduct(product.id)} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" />重新上架</button>
                                   <button type="button" onClick={() => { if (window.confirm(`確定永久刪除「${product.title}」？此操作無法復原。`)) onDeleteOfflineProduct(product.id); }} disabled={!isAdmin} className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"><Trash2 className="w-3 h-3" />永久刪除</button>
                                 </>
                               )}
@@ -945,6 +942,31 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                         ))}
                       </div>
                     </details>
+                    <div className="flex justify-end border-t border-slate-100 pt-3">
+                      {productView === 'available' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`確定將「${representative.campaign || representative.title}」整團 ${group.products.length} 項商品移至已下架清單？之後可整團重新上架。`)) {
+                              onArchiveProducts(group.products.map(product => product.id));
+                            }
+                          }}
+                          disabled={!isAdmin}
+                          className="px-3 py-2 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 disabled:opacity-50 inline-flex items-center gap-1"
+                        ><Trash2 className="w-3.5 h-3.5" />整團移至下架</button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`確定將「${representative.campaign || representative.title}」整團 ${group.products.length} 項商品重新上架？`)) {
+                              onReopenProducts(group.products.map(product => product.id));
+                            }
+                          }}
+                          disabled={!isAdmin}
+                          className="px-3 py-2 rounded-lg border border-emerald-200 bg-white text-emerald-700 text-xs font-semibold hover:bg-emerald-50 disabled:opacity-50 inline-flex items-center gap-1"
+                        ><RefreshCw className="w-3.5 h-3.5" />整團重新上架</button>
+                      )}
+                    </div>
                   </article>
                 );
               })}

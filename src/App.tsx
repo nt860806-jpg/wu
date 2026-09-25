@@ -537,19 +537,25 @@ export default function App() {
     return true;
   };
 
-  const handleArchiveProduct = async (productId: string) => {
-    const { error } = await supabase.from('products').update({ archived: true }).eq('id', productId);
+  const handleArchiveProducts = async (productIds: string[]) => {
+    if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase()) || productIds.length === 0) return;
+    const { error } = await supabase.from('products').update({ archived: true }).in('id', productIds);
     if (error) { window.alert('下架失敗，請稍後重試。'); return; }
-    setProducts(prev => prev.map(product => product.id === productId ? { ...product, archived: true } : product));
+    const selectedIds = new Set(productIds);
+    setProducts(prev => prev.map(product => selectedIds.has(product.id) ? { ...product, archived: true } : product));
   };
 
-  const handleReopenProduct = async (productId: string) => {
-    const product = products.find(item => item.id === productId);
-    if (!product) return;
-    const reopened = { ...product, archived: false, unpublishAt: null, status: 'active' as const };
-    const { error } = await supabase.from('products').update({ data: reopened, unpublish_at: null, archived: false }).eq('id', productId);
-    if (error) { window.alert('重新上架失敗，請稍後重試。'); return; }
-    setProducts(prev => prev.map(item => item.id === productId ? reopened : item));
+  const handleReopenProducts = async (productIds: string[]) => {
+    if (!currentUser.isLoggedIn || !ADMIN_EMAILS.includes(currentUser.email.toLowerCase()) || productIds.length === 0) return;
+    const selected = products.filter(product => productIds.includes(product.id));
+    if (selected.length !== productIds.length) return;
+    const reopened = selected.map(product => ({ ...product, archived: false, unpublishAt: null, status: 'active' as const }));
+    const results = await Promise.all(reopened.map(product =>
+      supabase.from('products').update({ data: product, unpublish_at: null, archived: false }).eq('id', product.id)
+    ));
+    if (results.some(({ error }) => error)) { window.alert('重新上架失敗，請稍後重試。'); return; }
+    const reopenedById = new Map(reopened.map(product => [product.id, product]));
+    setProducts(prev => prev.map(product => reopenedById.get(product.id) || product));
   };
 
   const handleDeleteOfflineProduct = async (productId: string) => {
@@ -689,8 +695,8 @@ export default function App() {
             onUpdateBatchStatus={handleUpdateBatchStatus}
             onOpenShare={() => setIsShareModalOpen(true)}
             onEditProduct={(product) => { setProductToEdit(product); handleNavigate('add-product'); }}
-            onArchiveProduct={handleArchiveProduct}
-            onReopenProduct={handleReopenProduct}
+            onArchiveProducts={handleArchiveProducts}
+            onReopenProducts={handleReopenProducts}
             onDeleteOfflineProduct={handleDeleteOfflineProduct}
             currentUser={currentUser}
             onSwitchUserRole={handleSwitchUserRole}
