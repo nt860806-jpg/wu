@@ -35,6 +35,8 @@ export interface Product {
   originalPrice?: number;
   krwPrice?: number; // 韓幣原價 ₩
   jpyPrice?: number; // 日圓原價 ¥
+  /** Maximum quantity a customer may purchase in one order. */
+  purchaseLimit?: number;
   paymentMethod?: OfficialPaymentAccount; // 官方周邊付款方式
   status: GroupBuyStatus;
   deadline: string; // ISO date or display string

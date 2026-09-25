@@ -251,12 +251,16 @@ export default function App() {
   // Cart operations
   const handleAddToCart = (product: Product, member: string | undefined, qty: number) => {
     setCartItems(prev => {
+      const productQuantity = prev.filter(item => item.product.id === product.id).reduce((sum, item) => sum + item.quantity, 0);
+      const allowedQuantity = product.purchaseLimit ? product.purchaseLimit - productQuantity : qty;
+      const quantityToAdd = Math.min(qty, allowedQuantity);
+      if (quantityToAdd < 1) return prev;
       const existingIdx = prev.findIndex(
         item => item.product.id === product.id && item.selectedMember === member
       );
       if (existingIdx > -1) {
         const updated = [...prev];
-        updated[existingIdx].quantity += qty;
+        updated[existingIdx].quantity += quantityToAdd;
         return updated;
       }
       return [
@@ -265,7 +269,7 @@ export default function App() {
           cartItemId: `${product.id}-${member || 'default'}-${Date.now()}`,
           product,
           selectedMember: member,
-          quantity: qty,
+          quantity: quantityToAdd,
         }
       ];
     });
@@ -280,7 +284,9 @@ export default function App() {
     setCartItems(prev =>
       prev.map(item => {
         if (item.cartItemId === cartItemId) {
-          const newQty = item.quantity + delta;
+          const productQuantity = prev.filter(cartItem => cartItem.product.id === item.product.id).reduce((sum, cartItem) => sum + cartItem.quantity, 0);
+          const remaining = item.product.purchaseLimit ? Math.max(0, item.product.purchaseLimit - productQuantity) : Math.abs(delta);
+          const newQty = item.quantity + (delta > 0 ? Math.min(delta, remaining) : delta);
           return newQty > 0 ? { ...item, quantity: newQty } : item;
         }
         return item;

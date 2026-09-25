@@ -148,7 +148,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     if (!selectedProduct) return;
     const items = selectedListingProducts.filter(item => selectedListingItems.includes(item.id));
     if (!items.length) return;
-    items.forEach(item => onAddToCart(item, listingMembers[item.id] || undefined, listingQuantities[item.id] || 1));
+    items.forEach(item => onAddToCart(item, listingMembers[item.id] || undefined, Math.min(listingQuantities[item.id] || 1, item.purchaseLimit || Infinity)));
     setAddedToast(true);
     setTimeout(() => {
       setAddedToast(false);
@@ -159,7 +159,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
     if (!selectedProduct) return;
     const items = selectedListingProducts.filter(item => selectedListingItems.includes(item.id));
     if (!items.length) return;
-    items.forEach(item => onInstantBuy(item, listingMembers[item.id] || undefined, listingQuantities[item.id] || 1));
+    items.forEach(item => onInstantBuy(item, listingMembers[item.id] || undefined, Math.min(listingQuantities[item.id] || 1, item.purchaseLimit || Infinity)));
     onSelectProduct(null);
   };
 
@@ -570,7 +570,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                               {(item.krwPrice || item.jpyPrice) && <div className="mt-1 flex gap-3 text-[10px] text-slate-500 font-mono">{item.krwPrice ? <span>韓幣 ₩{item.krwPrice.toLocaleString()}</span> : null}{item.jpyPrice ? <span>日圓 ¥{item.jpyPrice.toLocaleString()}</span> : null}</div>}
                               {checked && <div className="mt-2 flex flex-wrap items-end gap-2">
                                 {item.memberOptions && item.memberOptions.length > 0 && <label className="flex-1 min-w-32 text-[10px] font-semibold text-slate-600">選擇團員<select value={listingMembers[item.id] || ''} onChange={event => setListingMembers(current => ({ ...current, [item.id]: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs">{item.memberOptions.map(member => <option key={member} value={member}>{member}</option>)}</select></label>}
-                                <label className="text-[10px] font-semibold text-slate-600">數量<input type="number" min={1} value={listingQuantities[item.id] || 1} onChange={event => setListingQuantities(current => ({ ...current, [item.id]: Math.max(1, Number(event.target.value) || 1) }))} className="mt-1 block w-20 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-mono" /></label>
+                                <label className="text-[10px] font-semibold text-slate-600">數量{item.purchaseLimit ? `（限購 ${item.purchaseLimit} 件）` : ''}<input type="number" min={1} max={item.purchaseLimit} value={listingQuantities[item.id] || 1} onChange={event => setListingQuantities(current => ({ ...current, [item.id]: Math.min(item.purchaseLimit || Infinity, Math.max(1, Number(event.target.value) || 1)) }))} className="mt-1 block w-20 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-mono" /></label>
                                 <span className="pb-1 text-[10px] text-slate-500">小計 <strong className="font-mono text-slate-900">NT$ {(item.price * (listingQuantities[item.id] || 1)).toLocaleString()}</strong></span>
                               </div>}
                             </div>

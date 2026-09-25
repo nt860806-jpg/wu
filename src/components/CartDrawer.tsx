@@ -300,6 +300,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                 type="button"
                                 onClick={() => onUpdateQuantity(item.cartItemId, 1)}
                                 className="p-1 hover:bg-slate-100 text-slate-600"
+                                disabled={Boolean(item.product.purchaseLimit && cartItems.filter(cartItem => cartItem.product.id === item.product.id).reduce((sum, cartItem) => sum + cartItem.quantity, 0) >= item.product.purchaseLimit)}
                               >
                                 <Plus className="w-3.5 h-3.5" />
                               </button>

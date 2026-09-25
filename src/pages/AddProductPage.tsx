@@ -42,6 +42,7 @@ interface AdditionalProductDraft {
   price: number;
   krwPrice: number;
   jpyPrice: number;
+  purchaseLimit?: number;
   canChooseMember: boolean;
   memberOptionsText: string;
 }
@@ -78,6 +79,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
   const [price, setPrice] = useState<number>(editingProduct?.price ?? savedDraft?.price ?? 1280);
   const [krwPrice, setKrwPrice] = useState<number>(editingProduct?.krwPrice ?? savedDraft?.krwPrice ?? 55000);
   const [jpyPrice, setJpyPrice] = useState<number>(editingProduct?.jpyPrice ?? savedDraft?.jpyPrice ?? 6200);
+  const [purchaseLimit, setPurchaseLimit] = useState<number | undefined>(editingProduct?.purchaseLimit ?? savedDraft?.purchaseLimit);
   const [targetUnits, setTargetUnits] = useState<number>(editingProduct?.targetUnits ?? savedDraft?.targetUnits ?? 100);
   const [deadline, setDeadline] = useState(editingProduct?.deadline || savedDraft?.deadline || '2026-10-15T23:59:59');
   const [unpublishAt, setUnpublishAt] = useState(editingProduct?.unpublishAt || '');
@@ -116,6 +118,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
           price: product.price,
           krwPrice: product.krwPrice || 0,
           jpyPrice: product.jpyPrice || 0,
+          purchaseLimit: product.purchaseLimit,
           canChooseMember: Boolean(product.memberOptions?.length),
           memberOptionsText: product.memberOptions?.join(', ') || '',
         }))
@@ -125,6 +128,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
           price: item.price || 0,
           krwPrice: item.krwPrice || 0,
           jpyPrice: item.jpyPrice || 0,
+          purchaseLimit: item.purchaseLimit,
           canChooseMember: item.canChooseMember || false,
           memberOptionsText: item.memberOptionsText || '',
         }))
@@ -185,6 +189,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       price,
       krwPrice,
       jpyPrice,
+      purchaseLimit,
       targetUnits,
       deadline,
       unpublishAt,
@@ -211,6 +216,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     price,
     krwPrice,
     jpyPrice,
+    purchaseLimit,
     targetUnits,
     deadline,
     unpublishAt,
@@ -334,7 +340,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
   const handleAddAdditionalProduct = () => {
     setAdditionalProducts(prev => [
       ...prev,
-      { id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: '', price: 0, krwPrice: 0, jpyPrice: 0, canChooseMember: false, memberOptionsText: '' }
+      { id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, title: '', price: 0, krwPrice: 0, jpyPrice: 0, purchaseLimit: undefined, canChooseMember: false, memberOptionsText: '' }
     ]);
   };
 
@@ -365,6 +371,10 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
       setSubmitError('已勾選可選團員的商品，請填入該商品可選的團員名單。');
       return;
     }
+    if (productDrafts.some(item => item.purchaseLimit !== undefined && (!Number.isInteger(item.purchaseLimit) || item.purchaseLimit < 1))) {
+      setSubmitError('限購數量請填寫 1 以上的整數，或留空不限制。');
+      return;
+    }
 
     const primaryImage = galleryImages[0] || 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000&auto=format&fit=crop';
 
@@ -390,30 +400,57 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
     };
 
     if (isEditingGroup && editingProducts && onUpdateProduct) {
-      const groupUpdates = editingProducts.map((product, index) => {
-        const item = productDrafts[index];
-        if (!item) return product;
-        return ({
+      const listingGroupId = editingProducts[0].listingGroupId || `group-${Date.now()}`;
+      const groupUpdates = productDrafts.flatMap((item, index) => {
+        const product = index === 0
+          ? editingProducts[0]
+          : editingProducts.find(existing => existing.id === item.id);
+        if (!product) return [];
+        return [{
         ...product,
         ...commonProductFields,
+        listingGroupId,
         id: product.id,
         title: item.title.trim(),
         price: Number(item.price),
         originalPrice: Math.round(Number(item.price) * 1.15),
         krwPrice: item.krwPrice ? Number(item.krwPrice) : undefined,
         jpyPrice: item.jpyPrice ? Number(item.jpyPrice) : undefined,
+        purchaseLimit: item.purchaseLimit,
         currentUnits: product.currentUnits,
         targetUnits: Number(targetUnits) || 50,
         memberOptions: item.canChooseMember ? item.memberOptionsText.split(/[,，\n]/).map(member => member.trim()).filter(Boolean) : [],
         status: product.status,
         archived: product.archived,
-        });
+        }];
       });
 
       for (const [index, product] of groupUpdates.entries()) {
         const saved = await onUpdateProduct(product);
         if (!saved) {
           setSubmitError(`團務更新至第 ${index + 1} 項時失敗；請至後台確認已更新的商品後再重試。`);
+          return;
+        }
+      }
+      const existingIds = new Set(editingProducts.map(product => product.id));
+      const newProducts = productDrafts.slice(1).filter(item => !existingIds.has(item.id));
+      for (const [index, item] of newProducts.entries()) {
+        const product: Product = {
+          ...commonProductFields,
+          listingGroupId,
+          id: `prod-${Date.now()}-${index + 1}`,
+          title: item.title.trim(),
+          price: Number(item.price),
+          originalPrice: Math.round(Number(item.price) * 1.15),
+          krwPrice: item.krwPrice ? Number(item.krwPrice) : undefined,
+          jpyPrice: item.jpyPrice ? Number(item.jpyPrice) : undefined,
+          purchaseLimit: item.purchaseLimit,
+          targetUnits: Number(targetUnits) || 50,
+          memberOptions: item.canChooseMember ? item.memberOptionsText.split(/[,，\n]/).map(member => member.trim()).filter(Boolean) : [],
+        };
+        const saved = await onAddProduct(product);
+        if (!saved) {
+          setSubmitError(`新增第 ${index + 1} 項商品失敗；已完成的團務更新仍保留，請至後台確認後再重試。`);
           return;
         }
       }
@@ -434,6 +471,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
         originalPrice: Math.round(Number(item.price) * 1.15),
         krwPrice: item.krwPrice ? Number(item.krwPrice) : undefined,
         jpyPrice: item.jpyPrice ? Number(item.jpyPrice) : undefined,
+        purchaseLimit: item.purchaseLimit,
         targetUnits: Number(targetUnits) || 50,
         memberOptions: item.canChooseMember ? item.memberOptionsText.split(/[,，\n]/).map(member => member.trim()).filter(Boolean) : [],
       }));
@@ -638,8 +676,8 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                 </p>
               </div>
 
-              {/* Category and group target shared by this theme's products */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Category shared by this theme's products */}
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
                     商品類別 <span className="text-rose-500">*</span>
@@ -657,9 +695,6 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     <option value="服飾生活周邊">服飾生活配件周邊</option>
                   </select>
                 </div>
-                <label className="text-xs font-bold text-slate-700 block">本團務成團目標（件）
-                  <input type="number" min={1} value={targetUnits} onChange={event => setTargetUnits(Number(event.target.value))} className="mt-1 w-full px-3 py-2 text-xs sm:text-sm font-mono rounded-xl border border-slate-300 bg-white focus:outline-rose-500" />
-                </label>
               </div>
 
               {/* Each row is a sellable item under the same campaign. */}
@@ -669,11 +704,11 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     <h4 className="text-sm font-bold text-slate-900">{isEditingGroup ? '本團商品' : '本主題的商品品項'}</h4>
                     <p className="text-[11px] text-slate-500 mt-1">{isEditingGroup ? '在同一頁編輯團務介紹及各商品內容，完成後一次儲存。' : '每列都是同一主題中的一個商品，可分別設定幣別售價與可選團員。'}</p>
                   </div>
-                  {!isEditingGroup && <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增同團商品</button>}
+                  <button type="button" onClick={handleAddAdditionalProduct} className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-50"><Plus className="w-3.5 h-3.5" />新增同團商品</button>
                 </div>
                 {[
-                  { id: 'primary', title, price, krwPrice, jpyPrice, canChooseMember, memberOptionsText, primary: true },
-                  ...additionalProducts.map(item => ({ ...item, primary: false })),
+                  { id: 'primary', title, price, krwPrice, jpyPrice, purchaseLimit, canChooseMember, memberOptionsText, primary: true },
+                  ...additionalProducts.map(item => ({ ...item, primary: false, existing: Boolean(editingProducts?.some(product => product.id === item.id)) })),
                 ].map((item, index) => {
                   const updateItem = (updates: Partial<AdditionalProductDraft>) => {
                     if (item.primary) {
@@ -681,6 +716,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                       if (updates.price !== undefined) setPrice(updates.price);
                       if (updates.krwPrice !== undefined) setKrwPrice(updates.krwPrice);
                       if (updates.jpyPrice !== undefined) setJpyPrice(updates.jpyPrice);
+                      if (updates.purchaseLimit !== undefined || 'purchaseLimit' in updates) setPurchaseLimit(updates.purchaseLimit);
                       if (updates.canChooseMember !== undefined) setCanChooseMember(updates.canChooseMember);
                       if (updates.memberOptionsText !== undefined) setMemberOptionsText(updates.memberOptionsText);
                     } else {
@@ -689,13 +725,14 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                   };
                   return (
                     <article key={item.id} className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
-                      <div className="flex items-center justify-between"><h5 className="text-xs font-bold text-slate-800">商品 {index + 1}</h5>{!item.primary && !isEditingGroup && <button type="button" onClick={() => handleRemoveAdditionalProduct(item.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" aria-label={`刪除商品 ${index + 1}`}><Trash2 className="w-4 h-4" /></button>}</div>
+                      <div className="flex items-center justify-between"><h5 className="text-xs font-bold text-slate-800">商品 {index + 1}</h5>{!item.primary && (!isEditingGroup || !item.existing) && <button type="button" onClick={() => handleRemoveAdditionalProduct(item.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" aria-label={`刪除商品 ${index + 1}`}><Trash2 className="w-4 h-4" /></button>}</div>
                       <label className="block text-[11px] font-semibold text-slate-600">商品名稱 <span className="text-rose-500">*</span><input required type="text" value={item.title} onChange={event => updateItem({ title: event.target.value })} placeholder="例如：專輯 A Ver.、應援毛巾" className="mt-1 w-full px-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-rose-500" /></label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <label className="block text-[11px] font-semibold text-slate-600">台幣售價（結帳使用）<span className="text-rose-500">*</span><div className="relative mt-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-600">NT$</span><input required type="number" min={1} value={item.price || ''} onChange={event => updateItem({ price: Number(event.target.value) })} placeholder="1,280" className="w-full pl-11 pr-3 py-2.5 text-sm font-mono rounded-xl border border-rose-300 focus:outline-rose-500" /></div></label>
                         <label className="block text-[11px] font-semibold text-slate-600">韓幣售價（選填）<div className="relative mt-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">₩</span><input type="number" min={0} value={item.krwPrice || ''} onChange={event => updateItem({ krwPrice: Number(event.target.value) })} placeholder="選填" className="w-full pl-8 pr-3 py-2.5 text-sm font-mono rounded-xl border border-slate-300 focus:outline-rose-500" /></div></label>
                         <label className="block text-[11px] font-semibold text-slate-600">日圓售價（選填）<div className="relative mt-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">¥</span><input type="number" min={0} value={item.jpyPrice || ''} onChange={event => updateItem({ jpyPrice: Number(event.target.value) })} placeholder="選填" className="w-full pl-8 pr-3 py-2.5 text-sm font-mono rounded-xl border border-slate-300 focus:outline-rose-500" /></div></label>
                       </div>
+                      <label className="block text-[11px] font-semibold text-slate-600">限購數量（選填）<input type="number" min={1} step={1} value={item.purchaseLimit ?? ''} onChange={event => updateItem({ purchaseLimit: event.target.value === '' ? undefined : Number(event.target.value) })} placeholder="不限制" className="mt-1 w-full px-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-rose-500" /><span className="mt-1 block text-[10px] text-slate-400">留空代表不限購；設定後每位會員每筆訂單最多購買此數量。</span></label>
                       <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer"><input type="checkbox" checked={item.canChooseMember} onChange={event => updateItem({ canChooseMember: event.target.checked })} className="rounded text-rose-600 focus:ring-rose-500 w-4 h-4" />這個商品開放選擇團員</label>
                       {item.canChooseMember && <label className="block text-[11px] font-semibold text-slate-600">此商品可選團員 <span className="text-rose-500">*</span><input required type="text" value={item.memberOptionsText} onChange={event => updateItem({ memberOptionsText: event.target.value })} placeholder="輸入團員名稱，以逗號分隔" className="mt-1 w-full px-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-rose-500" /><span className="block mt-1 text-[10px] text-slate-400">例如：娜璉、定延、Momo、Sana</span></label>}
                     </article>
@@ -1030,15 +1067,6 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
                     {description}
                   </p>
 
-                  <div className="space-y-1 pt-1">
-                    <div className="flex justify-between text-[11px] font-mono text-slate-500">
-                      <span>已集單 0/{targetUnits} 件</span>
-                      <span className="font-bold text-rose-600">0%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 h-1.5 rounded-full">
-                      <div className="bg-rose-500 h-full rounded-full w-2" />
-                    </div>
-                  </div>
                 </div>
               </div>
 
