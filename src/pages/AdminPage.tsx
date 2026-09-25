@@ -70,7 +70,7 @@ export const ORDER_STATUS_FLOW_STEPS: {
   badgeColor: string;
 }[] = [
   { status: 'order_created', stepNum: 1, label: '1. 訂單成立', desc: '官方團務開放，訂單成立待轉帳', badgeColor: 'bg-amber-50 text-amber-800 border-amber-200' },
-  { status: 'payment_verifying', stepNum: 2, label: '2. 匯款核對', desc: '粉絲已填末五碼，1-2天內對帳核款', badgeColor: 'bg-blue-50 text-blue-800 border-blue-200' },
+  { status: 'payment_verifying', stepNum: 2, label: '2. 匯款核對', desc: '已提交匯款資料，1-2天內對帳核款', badgeColor: 'bg-blue-50 text-blue-800 border-blue-200' },
   { status: 'procuring', stepNum: 3, label: '3. 官方採購中', desc: '鎖定官方通路配額與限定特典', badgeColor: 'bg-purple-50 text-purple-800 border-purple-200' },
   { status: 'ordered', stepNum: 4, label: '4. 已下單', desc: '首爾官方網站正式下單成功', badgeColor: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
   { status: 'shipped_kr', stepNum: 5, label: '5. 已出貨', desc: '韓國官方倉庫發貨配送中', badgeColor: 'bg-cyan-50 text-cyan-800 border-cyan-200' },
@@ -331,7 +331,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       const matchNick = o.socialNickname?.toLowerCase().includes(q);
       const matchBatch = o.batchCode?.toLowerCase().includes(q);
       const matchBank = o.bankLastFive?.includes(q);
-      if (!matchId && !matchName && !matchPhone && !matchNick && !matchBatch && !matchBank) return false;
+      const matchTransferor = o.transferorName?.toLowerCase().includes(q);
+      if (!matchId && !matchName && !matchPhone && !matchNick && !matchBatch && !matchBank && !matchTransferor) return false;
     }
     return true;
   });
@@ -524,7 +525,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     const headers = [
       '主題', '藝人團體', '品項', '規格/成員', '單價', '數量', '品項小計',
       '訂單編號', '下單日期', '團次代碼', '訂購人姓名', '社群暱稱', '手機號碼', '信箱',
-      '特典小卡順位', '訂單總金額', '二補金額', '付款方式', '指定收款帳戶', '匯款狀態', '帳號末五碼',
+      '特典小卡順位', '訂單總金額', '二補金額', '付款方式', '指定收款帳戶', '匯款狀態', '轉帳人姓名', '帳號末五碼',
       '九階段物流狀態', '備註'
     ];
     const itemRows = filteredOrders.flatMap(order =>
@@ -568,6 +569,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         isFirstLineForOrder ? order.paymentChoice === 'cash_on_delivery' ? '貨付' : '轉帳' : '',
         isFirstLineForOrder ? order.paymentChoice === 'cash_on_delivery' ? '' : order.paymentAccount || '全支付(389)11016053741860' : '',
         isFirstLineForOrder ? order.paymentChoice === 'cash_on_delivery' ? '貨付' : (order.paymentStatus === 'paid' || isPaymentConfirmedByOrderStatus(order.orderStatus)) ? '已核帳' : order.paymentStatus === 'verifying' ? '核對中' : '未付款' : '',
+        isFirstLineForOrder ? order.transferorName || '' : '',
         isFirstLineForOrder ? order.bankLastFive || '' : '',
         isFirstLineForCampaign ? getStatusBadge(getOrderCampaignStatus(order, group.artist, group.campaign, batches)).label : '',
         isFirstLineForOrder ? order.notes || '' : ''
@@ -1107,7 +1109,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="搜尋訂單編號 / 暱稱 / 姓名 / 末五碼..."
+                    placeholder="搜尋訂單編號 / 暱稱 / 姓名 / 轉帳人 / 末五碼..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-rose-500 font-medium"
@@ -1435,6 +1437,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                               <div className={`text-[10px] font-bold mt-0.5 ${order.paymentChoice === 'cash_on_delivery' ? 'text-slate-600' : 'text-indigo-600'}`}>
                                 付款方式：{order.paymentChoice === 'cash_on_delivery' ? '貨付' : '轉帳'}
                               </div>
+                              {order.paymentChoice !== 'cash_on_delivery' && order.transferorName && (
+                                <div className="text-[11px] text-slate-700 mt-0.5">轉帳人：{order.transferorName}</div>
+                              )}
                               {order.bankLastFive ? (
                                 <div className="text-[11px] text-rose-600 font-bold bg-rose-50 px-1.5 py-0.2 rounded inline-block mt-0.5 border border-rose-200">
                                   後5碼: {order.bankLastFive}
