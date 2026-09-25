@@ -625,7 +625,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({
                 {selectedProduct.description}
               </p>
               <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600 flex items-center justify-between">
-                <span>預計抵台時間：<strong>{selectedProduct.releaseDateText}</strong></span>
+                <span>官方出貨時間：<strong>{selectedProduct.releaseDateText}</strong></span>
                 <span>集單截止：<strong className="text-rose-600">{selectedProduct.deadline}</strong></span>
               </div>
             </div>

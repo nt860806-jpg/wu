@@ -882,7 +882,7 @@ export const AddProductPage: React.FC<AddProductPageProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">
-                    預計抵台與出貨時程
+                    官方出貨時間
                   </label>
                   <input
                     type="text"
