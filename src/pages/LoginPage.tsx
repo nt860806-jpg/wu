@@ -642,7 +642,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         {order.bankLastFive && (
                           <span>末五碼：<strong className="font-mono text-rose-600">{order.bankLastFive}</strong></span>
                         )}
-                        {order.paymentAccount && (
+                        {order.paymentAccount && order.orderStatus !== 'cancelled' && order.paymentStatus !== 'paid' && !isPaymentConfirmedByOrderStatus(order.orderStatus) && (
                           <span className="text-slate-500">匯入：<span className="font-mono text-[11px]">{order.paymentAccount}</span></span>
                         )}
                       </div>
